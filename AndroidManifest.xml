@@ -14,7 +14,7 @@
     <application
         android:label="Jadwal Sholat TV"
         android:icon="@drawable/ic_app"
-        android:banner="@drawable/ic_app"
+        android:banner="@drawable/banner"
         android:allowBackup="true"
         android:supportsRtl="true"
         android:theme="@style/SholatTheme">

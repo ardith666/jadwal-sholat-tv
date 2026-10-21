@@ -1,8 +1,11 @@
 package com.ardith.sholattv;
 
+import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.content.Intent;
+import android.net.Uri;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.ViewGroup;
@@ -19,18 +22,27 @@ import java.util.Locale;
 
 public final class SettingsDialog {
 
+    public static final int REQUEST_CODE_PICK_IMAGE = 1001;
+
     public interface OnSettingsChangeListener {
         void onLocationChanged();
         void onPreferencesChanged();
         void onThemeChanged();
+        void onPickImageFromGallery();
     }
 
     public static void show(Context context, PrayerEngine prayerEngine, AlertManager alertManager, OnSettingsChangeListener listener) {
+        String currentBgLabel = alertManager.getCustomBgUri() != null
+                ? "🖼 Foto Kustom dari Galeri"
+                : "🖼 Tema Background: " + getThemeName(alertManager.getTheme());
+
         String[] options = new String[]{
                 "📍 Ganti Lokasi Kota (" + prayerEngine.getCityName() + ")",
-                "🖼 Pilihan Background Tema (" + getThemeName(alertManager.getTheme()) + ")",
+                currentBgLabel,
+                "📂 Pilih Background dari Galeri TV",
                 "🔊 Suara Waktu Sholat: " + getSoundLabel(alertManager.getSoundMode()),
                 "⏱ Hitung Mundur 5 Menit: " + (alertManager.isCountdownEnabled() ? "ON" : "OFF"),
+                "🔔 Suara Beep Countdown (30s, 20s, 10-0s): " + (alertManager.isCountdownAudioEnabled() ? "ON" : "OFF"),
                 "📺 Layar Selalu ON (Anti-Sleep): " + (alertManager.isKeepAwake() ? "ON" : "OFF"),
                 "📖 Tampilkan Teks Arab: " + (alertManager.isShowArab() ? "ON" : "OFF"),
                 "🔤 Tampilkan Teks Latin: " + (alertManager.isShowLatin() ? "ON" : "OFF"),
@@ -49,32 +61,39 @@ public final class SettingsDialog {
                             showThemePicker(context, alertManager, listener);
                             break;
                         case 2:
-                            showSoundPicker(context, alertManager, listener);
+                            if (listener != null) listener.onPickImageFromGallery();
                             break;
                         case 3:
+                            showSoundPicker(context, alertManager, listener);
+                            break;
+                        case 4:
                             alertManager.setCountdownEnabled(!alertManager.isCountdownEnabled());
                             if (listener != null) listener.onPreferencesChanged();
                             break;
-                        case 4:
-                            alertManager.setKeepAwake(!alertManager.isKeepAwake());
-                            if (listener != null) listener.onPreferencesChanged();
-                            break;
                         case 5:
-                            alertManager.setShowArab(!alertManager.isShowArab());
+                            alertManager.setCountdownAudioEnabled(!alertManager.isCountdownAudioEnabled());
                             if (listener != null) listener.onPreferencesChanged();
                             break;
                         case 6:
-                            alertManager.setShowLatin(!alertManager.isShowLatin());
+                            alertManager.setKeepAwake(!alertManager.isKeepAwake());
                             if (listener != null) listener.onPreferencesChanged();
                             break;
                         case 7:
-                            alertManager.setShowTranslation(!alertManager.isShowTranslation());
+                            alertManager.setShowArab(!alertManager.isShowArab());
                             if (listener != null) listener.onPreferencesChanged();
                             break;
                         case 8:
+                            alertManager.setShowLatin(!alertManager.isShowLatin());
+                            if (listener != null) listener.onPreferencesChanged();
+                            break;
+                        case 9:
+                            alertManager.setShowTranslation(!alertManager.isShowTranslation());
+                            if (listener != null) listener.onPreferencesChanged();
+                            break;
+                        case 10:
                             new AlertDialog.Builder(context, android.R.style.Theme_DeviceDefault_Dialog_Alert)
                                     .setTitle("Tentang Aplikasi")
-                                    .setMessage("Jadwal Sholat TV v1.1\n\nDibuat oleh: ardith666\nGitHub: github.com/ardith666/jadwal-sholat-tv\n\nKhusus Android TV & Google TV.")
+                                    .setMessage("Jadwal Sholat TV v1.2\n\nDibuat oleh: ardith666\nGitHub: github.com/ardith666/jadwal-sholat-tv\n\nFitur lengkap: Kiosk ambient, 30 background (20 foto masjid & 10 motif), audio countdown 30s/20s/10-0s, custom gallery, zero background RAM usage.")
                                     .setPositiveButton("Tutup", null)
                                     .show();
                             break;
@@ -91,25 +110,48 @@ public final class SettingsDialog {
     }
 
     public static final String[][] THEMES = new String[][]{
-            // 5 Tema Gelap
-            {"01_midnight_kaaba.jpg", "🌙 Midnight Ka'bah (Gelap)"},
-            {"02_emerald_nabawi.jpg", "🕌 Emerald Nabawi (Gelap)"},
-            {"03_sapphire_night.jpg", "🌌 Sapphire Night (Gelap)"},
-            {"04_royal_purple.jpg", "🟣 Royal Islamic Purple (Gelap)"},
-            {"05_charcoal_minimal.jpg", "🌑 Charcoal Minimal (Gelap)"},
-            // 5 Tema Terang
-            {"06_ivory_andalusia.jpg", "☀️ Ivory Andalusia (Terang)"},
-            {"07_desert_gold.jpg", "🏜 Desert Gold (Terang)"},
-            {"08_sage_garden.jpg", "🌿 Sage Green Garden (Terang)"},
-            {"09_serene_sky.jpg", "⛅ Serene Sky Blue (Terang)"},
-            {"10_marble_white.jpg", "🏛 Marble White Mosque (Terang)"}
+            // --- 10 Foto Masjid Malam / Gelap ---
+            {"photo_dark_01.jpg", "📸 [Foto Malam] Kauno Mosque Night"},
+            {"photo_dark_02.jpg", "📸 [Foto Malam] Illuminated Minaret Night"},
+            {"photo_dark_03.jpg", "📸 [Foto Malam] Blue Mosque Istanbul Night"},
+            {"photo_dark_04.jpg", "📸 [Foto Malam] Golden Mosque Dome Night"},
+            {"photo_dark_05.jpg", "📸 [Foto Malam] Grand Mosque Lights"},
+            {"photo_dark_06.jpg", "📸 [Foto Malam] Twilight Minaret Silhouette"},
+            {"photo_dark_07.jpg", "📸 [Foto Malam] Holy Ka'bah Makkah Night"},
+            {"photo_dark_08.jpg", "📸 [Foto Malam] Islamic Arch & Moon"},
+            {"photo_dark_09.jpg", "📸 [Foto Malam] Illuminated Grand Courtyard"},
+            {"photo_dark_10.jpg", "📸 [Foto Malam] Crescent Sky over Mosque"},
+
+            // --- 10 Foto Masjid Siang / Terang ---
+            {"photo_light_01.jpg", "📸 [Foto Siang] Sultan Omar Ali Saifuddin"},
+            {"photo_light_02.jpg", "📸 [Foto Siang] White Mosque Sunny Sky"},
+            {"photo_light_03.jpg", "📸 [Foto Siang] Minarets under Clear Blue Sky"},
+            {"photo_light_04.jpg", "📸 [Foto Siang] Sheikh Zayed Grand Mosque"},
+            {"photo_light_05.jpg", "📸 [Foto Siang] Majestic Mosque Sunlight"},
+            {"photo_light_06.jpg", "📸 [Foto Siang] Blue Mosque Daylight Courtyard"},
+            {"photo_light_07.jpg", "📸 [Foto Siang] Golden Hour Mosque Dome"},
+            {"photo_light_08.jpg", "📸 [Foto Siang] White Marble Columns"},
+            {"photo_light_09.jpg", "📸 [Foto Siang] Skyward Minarets Sunlight"},
+            {"photo_light_10.jpg", "📸 [Foto Siang] Grand Marble Architecture"},
+
+            // --- 10 Motif Geometris Islamic ---
+            {"01_midnight_kaaba.jpg", "🎨 [Motif Gelap] Midnight Ka'bah Minimal"},
+            {"02_emerald_nabawi.jpg", "🎨 [Motif Gelap] Emerald Nabawi Green"},
+            {"03_sapphire_night.jpg", "🎨 [Motif Gelap] Sapphire Night Blue"},
+            {"04_royal_purple.jpg", "🎨 [Motif Gelap] Royal Islamic Purple"},
+            {"05_charcoal_minimal.jpg", "🎨 [Motif Gelap] Charcoal Slate Minimal"},
+            {"06_ivory_andalusia.jpg", "🎨 [Motif Terang] Ivory Andalusia Gold"},
+            {"07_desert_gold.jpg", "🎨 [Motif Terang] Desert Sand Gold"},
+            {"08_sage_garden.jpg", "🎨 [Motif Terang] Sage Green Garden"},
+            {"09_serene_sky.jpg", "🎨 [Motif Terang] Serene Sky Blue"},
+            {"10_marble_white.jpg", "🎨 [Motif Terang] Marble White Arch"}
     };
 
     private static String getThemeName(String file) {
         for (String[] t : THEMES) {
             if (t[0].equals(file)) return t[1];
         }
-        return "Midnight Ka'bah (Gelap)";
+        return "Foto Malam Kauno Mosque";
     }
 
     private static void showThemePicker(Context context, AlertManager alertManager, OnSettingsChangeListener listener) {
@@ -122,7 +164,7 @@ public final class SettingsDialog {
         }
 
         new AlertDialog.Builder(context, android.R.style.Theme_DeviceDefault_Dialog_Alert)
-                .setTitle("Pilih Tema Background (10 Tema)")
+                .setTitle("Pilih Background (20 Foto + 10 Motif)")
                 .setSingleChoiceItems(names, selected, (dialog, which) -> {
                     alertManager.setTheme(THEMES[which][0]);
                     dialog.dismiss();
@@ -157,7 +199,6 @@ public final class SettingsDialog {
         List<PrayerEngine.City> allCities = prayerEngine.loadCities();
         if (allCities.isEmpty()) return;
 
-        // Sort ASC by text
         Collections.sort(allCities, (a, b) -> a.name.compareToIgnoreCase(b.name));
 
         final List<PrayerEngine.City> filtered = new ArrayList<>(allCities);

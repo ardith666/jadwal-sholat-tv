@@ -17,15 +17,18 @@ public final class AlertManager {
     public static final String MODE_SILENT = "silent";
 
     public static final String KEY_COUNTDOWN_ENABLED = "countdown_enabled";
+    public static final String KEY_COUNTDOWN_AUDIO = "countdown_audio";
     public static final String KEY_KEEP_AWAKE = "keep_awake";
     public static final String KEY_SHOW_ARAB = "show_arab";
     public static final String KEY_SHOW_LATIN = "show_latin";
     public static final String KEY_SHOW_TRANSLATION = "show_translation";
     public static final String KEY_THEME = "theme_bg";
-    public static final String DEFAULT_THEME = "01_midnight_kaaba.jpg";
+    public static final String DEFAULT_THEME = "photo_dark_01.jpg";
+    public static final String KEY_CUSTOM_BG_URI = "custom_bg_uri";
 
     private final Context ctx;
     private MediaPlayer mediaPlayer;
+    private MediaPlayer pipPlayer;
 
     public AlertManager(Context context) {
         this.ctx = context.getApplicationContext();
@@ -49,6 +52,16 @@ public final class AlertManager {
     public void setCountdownEnabled(boolean enabled) {
         ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                 .edit().putBoolean(KEY_COUNTDOWN_ENABLED, enabled).apply();
+    }
+
+    public boolean isCountdownAudioEnabled() {
+        return ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .getBoolean(KEY_COUNTDOWN_AUDIO, true);
+    }
+
+    public void setCountdownAudioEnabled(boolean enabled) {
+        ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit().putBoolean(KEY_COUNTDOWN_AUDIO, enabled).apply();
     }
 
     public boolean isKeepAwake() {
@@ -98,7 +111,69 @@ public final class AlertManager {
 
     public void setTheme(String themeFile) {
         ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                .edit().putString(KEY_THEME, themeFile).apply();
+                .edit()
+                .putString(KEY_THEME, themeFile)
+                .remove(KEY_CUSTOM_BG_URI)
+                .apply();
+    }
+
+    public String getCustomBgUri() {
+        return ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .getString(KEY_CUSTOM_BG_URI, null);
+    }
+
+    public void setCustomBgUri(String uriStr) {
+        ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit().putString(KEY_CUSTOM_BG_URI, uriStr).apply();
+    }
+
+    public void playCountdownPip(int remainingSec) {
+        if (!isCountdownAudioEnabled() || MODE_SILENT.equals(getSoundMode())) {
+            return;
+        }
+
+        String assetFile = null;
+        if (remainingSec == 30) {
+            assetFile = "audio/warning_30s.wav";
+        } else if (remainingSec == 20) {
+            assetFile = "audio/warning_20s.wav";
+        } else if (remainingSec >= 1 && remainingSec <= 10) {
+            assetFile = "audio/count_" + remainingSec + ".wav";
+        } else if (remainingSec == 0) {
+            assetFile = "audio/count_0.wav";
+        }
+
+        if (assetFile != null) {
+            playShortSound(assetFile);
+        }
+    }
+
+    private void playShortSound(String assetPath) {
+        try {
+            if (pipPlayer != null) {
+                try {
+                    pipPlayer.reset();
+                    pipPlayer.release();
+                } catch (Exception ignored) {}
+                pipPlayer = null;
+            }
+            AssetFileDescriptor afd = ctx.getAssets().openFd(assetPath);
+            pipPlayer = new MediaPlayer();
+            pipPlayer.setAudioAttributes(new AudioAttributes.Builder()
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+                    .build());
+            pipPlayer.setDataSource(afd.getFileDescriptor(), afd.getStartOffset(), afd.getLength());
+            afd.close();
+            pipPlayer.prepare();
+            pipPlayer.setOnCompletionListener(mp -> {
+                try { mp.release(); } catch (Exception ignored) {}
+                if (pipPlayer == mp) pipPlayer = null;
+            });
+            pipPlayer.start();
+        } catch (Exception e) {
+            Log.e(TAG, "Error playing sound: " + assetPath, e);
+        }
     }
 
     public void playPrayerAlert() {
@@ -136,6 +211,13 @@ public final class AlertManager {
                 mediaPlayer.release();
             } catch (Exception ignored) {}
             mediaPlayer = null;
+        }
+        if (pipPlayer != null) {
+            try {
+                if (pipPlayer.isPlaying()) pipPlayer.stop();
+                pipPlayer.release();
+            } catch (Exception ignored) {}
+            pipPlayer = null;
         }
     }
 }

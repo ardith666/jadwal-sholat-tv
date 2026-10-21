@@ -23,3 +23,9 @@
 - [2026-10-21 07:45] Integrasi Widget tv-home:
   - Card widget di launcher diperbarui dengan opsi "Buka Layar Penuh" untuk meluncurkan `jadwal-sholat-tv`
   - Status: ✅ Terverifikasi (Screenshots: backup/tcl-11-prayer-options-dialog.png, backup/tcl-12-launched-from-widget.png)
+
+- [2026-10-21 08:00] Rilis v1.1 - Fitur Tambahan:
+  - Search & Sort Kota: Dialog pemilihan kota kini diurutkan A-Z secara alfabetis dan dilengkapi kolom pencarian teks real-time
+  - 10 Tema Background Islamic: 5 tema gelap (Midnight Ka'bah, Emerald Nabawi, Sapphire Night, Royal Purple, Charcoal) + 5 tema terang (Ivory Andalusia, Desert Gold, Sage Garden, Serene Sky, Marble White) dengan scrim overlay otomatis
+  - Atribusi Contributor: Menampilkan "Dibuat oleh : ardith666" di sudut kanan bawah layar utama dan menu "Tentang Aplikasi" di dialog pengaturan
+  - Status: ✅ Terverifikasi di TV & dipush ke GitHub (Commit 18b389f)

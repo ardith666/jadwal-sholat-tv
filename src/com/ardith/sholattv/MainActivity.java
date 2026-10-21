@@ -1,12 +1,13 @@
 package com.ardith.sholattv;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.Typeface;
-import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.GradientDrawable;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -18,7 +19,6 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.view.animation.AlphaAnimation;
-import android.view.animation.OvershootInterpolator;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -59,12 +59,15 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
     private PrayerEngine.DaySchedule currentSchedule;
     private int highlightedSlotIndex = -1;
     private int lastAlertTriggeredMinute = -1;
+    private int lastPlayedPipSecond = -1;
 
+    private boolean isActivityActive = false;
     private final Handler handler = new Handler(Looper.getMainLooper());
 
     private final Runnable timerTick = new Runnable() {
         @Override
         public void run() {
+            if (!isActivityActive) return;
             updateClockAndSchedule();
             handler.postDelayed(this, 1000);
         }
@@ -73,6 +76,7 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
     private final Runnable quranRotation = new Runnable() {
         @Override
         public void run() {
+            if (!isActivityActive) return;
             rotateQuranVerse();
             handler.postDelayed(this, 25000);
         }
@@ -86,13 +90,45 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
         quranEngine = new QuranEngine(this);
         alertManager = new AlertManager(this);
 
-        applyKeepAwake();
         buildUI();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        isActivityActive = true;
+        applyKeepAwake();
         applyTheme();
 
         loadScheduleAsync();
+        handler.removeCallbacks(timerTick);
+        handler.removeCallbacks(quranRotation);
         handler.post(timerTick);
         handler.postDelayed(quranRotation, 3000);
+        Log.i(TAG, "onResume: active, timer & rotation started");
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        isActivityActive = false;
+        // ZERO BACKGROUND RESOURCE FOOTPRINT: stop all callbacks and audio
+        handler.removeCallbacksAndMessages(null);
+        if (alertManager != null) {
+            alertManager.stopAudio();
+        }
+        // Release background image bitmap if needed
+        Log.i(TAG, "onPause: paused, stopped all handlers and audio to preserve RAM");
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        isActivityActive = false;
+        handler.removeCallbacksAndMessages(null);
+        if (alertManager != null) {
+            alertManager.stopAudio();
+        }
     }
 
     private void applyKeepAwake() {
@@ -104,6 +140,19 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
     }
 
     private void applyTheme() {
+        String customUri = alertManager.getCustomBgUri();
+        if (customUri != null) {
+            try (InputStream in = getContentResolver().openInputStream(Uri.parse(customUri))) {
+                Bitmap bmp = BitmapFactory.decodeStream(in);
+                if (bmp != null) {
+                    bgImageView.setImageBitmap(bmp);
+                    return;
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "Failed loading custom image uri, fallback to bundled theme: " + e.getMessage());
+            }
+        }
+
         String themeFile = alertManager.getTheme();
         try (InputStream in = getAssets().open("backgrounds/" + themeFile)) {
             Bitmap bmp = BitmapFactory.decodeStream(in);
@@ -382,11 +431,18 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
             countdownBanner.setVisibility(View.VISIBLE);
             countdownBanner.setText(String.format(Locale.getDefault(),
                     "⏳ Menuju Waktu %s: -%02d:%02d", nextSlot.name, m, s));
+
+            // Suara hitung mundur: 30s, 20s, dan 10 s/d 0s
+            if ((nextDiffSec == 30 || nextDiffSec == 20 || (nextDiffSec >= 0 && nextDiffSec <= 10))
+                    && nextDiffSec != lastPlayedPipSecond) {
+                lastPlayedPipSecond = nextDiffSec;
+                alertManager.playCountdownPip(nextDiffSec);
+            }
         } else {
             countdownBanner.setVisibility(View.GONE);
         }
 
-        // Trigger alert tepat pada waktu sholat (detik 0)
+        // Trigger alert adzan tepat pada waktu sholat (detik 0)
         if (nextDiffSec == 0 && nowMin != lastAlertTriggeredMinute) {
             lastAlertTriggeredMinute = nowMin;
             onPrayerTimeArrived(nextSlot.name);
@@ -401,7 +457,7 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
     }
 
     private void rotateQuranVerse() {
-        if (quranCardContainer == null) return;
+        if (quranCardContainer == null || !isActivityActive) return;
         QuranEngine.Verse v = quranEngine.getRandomVerse();
 
         AlphaAnimation fadeOut = new AlphaAnimation(1f, 0f);
@@ -463,8 +519,34 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
     }
 
     @Override
+    public void onPickImageFromGallery() {
+        try {
+            Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+            intent.setType("image/*");
+            intent.addCategory(Intent.CATEGORY_OPENABLE);
+            startActivityForResult(Intent.createChooser(intent, "Pilih Gambar Background TV"), SettingsDialog.REQUEST_CODE_PICK_IMAGE);
+        } catch (Exception e) {
+            Toast.makeText(this, "Tidak ada aplikasi Galeri / File Picker di TV", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == SettingsDialog.REQUEST_CODE_PICK_IMAGE && resultCode == RESULT_OK && data != null) {
+            Uri selectedUri = data.getData();
+            if (selectedUri != null) {
+                alertManager.setCustomBgUri(selectedUri.toString());
+                applyTheme();
+                Toast.makeText(this, "Background kustom dari Galeri diterapkan", Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
+
+    @Override
     protected void onDestroy() {
         super.onDestroy();
+        isActivityActive = false;
         handler.removeCallbacksAndMessages(null);
         if (alertManager != null) alertManager.stopAudio();
     }
