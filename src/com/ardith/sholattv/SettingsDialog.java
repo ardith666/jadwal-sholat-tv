@@ -141,21 +141,21 @@ public final class SettingsDialog {
         textCol.setPadding(dp(context, 18), 0, 0, 0);
 
         TextView headerTitle = new TextView(context);
-        headerTitle.setText("💚 Dukung Pengembang (Contributor: ardith666)");
+        headerTitle.setText("Infaq & Dukungan Pengembangan");
         headerTitle.setTextColor(0xFFFFD700);
         headerTitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
         headerTitle.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
         textCol.addView(headerTitle);
 
         TextView supportMsg = new TextView(context);
-        supportMsg.setText("Jika ingin men-support developer silahkan scan QRIS berikut. Jika tidak berkenan, silahkan bantu dengan doa.");
+        supportMsg.setText("Aplikasi ini dibuat tulus sebagai amal jariyah & open source. Jika Anda merasakan manfaatnya dan tergerak untuk menitipkan infaq operasional, silakan scan QRIS di samping. Doa tulus Anda pun adalah dukungan yang amat berharga bagi kami.");
         supportMsg.setTextColor(0xE6FFFFFF);
         supportMsg.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
         supportMsg.setPadding(0, dp(context, 3), 0, dp(context, 4));
         textCol.addView(supportMsg);
 
         TextView prayerMsg = new TextView(context);
-        prayerMsg.setText("“Jazakumullahu khairan” (Semoga Allah membalas kalian dengan kebaikan)");
+        prayerMsg.setText("“Jazakumullahu khairan wa barakallahu fiikum”\n(Semoga Allah membalas kebaikan & memberkahi antum sekeluarga)");
         prayerMsg.setTextColor(0xFF7EE787);
         prayerMsg.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
         prayerMsg.setTypeface(Typeface.create("sans-serif", Typeface.ITALIC));
@@ -305,7 +305,7 @@ public final class SettingsDialog {
         layout.addView(whiteBox);
 
         TextView tv = new TextView(context);
-        tv.setText("Scan QRIS dengan GoPay, OVO, Dana, BCA, Livin, dll.\n“Jazakumullahu khairan”");
+        tv.setText("Infaq Operasional & Pengembangan Aplikasi\nScan QRIS dengan GoPay, OVO, Dana, ShopeePay, BCA, Livin, dll.\n\n“Jazakumullahu khairan wa barakallahu fiikum”");
         tv.setTextColor(0xFFFFFFFF);
         tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
         tv.setGravity(Gravity.CENTER);
@@ -313,7 +313,7 @@ public final class SettingsDialog {
         layout.addView(tv);
 
         new AlertDialog.Builder(context, android.R.style.Theme_DeviceDefault_Dialog_Alert)
-                .setTitle("QRIS Dukungan Developer")
+                .setTitle("Infaq & Dukungan Developer")
                 .setView(layout)
                 .setPositiveButton("Kembali", (dialog, which) -> show(context, pe, am, l))
                 .setOnCancelListener(dialog -> show(context, pe, am, l))
@@ -332,13 +332,13 @@ public final class SettingsDialog {
 
         LinearLayout layout = new LinearLayout(context);
         layout.setOrientation(LinearLayout.VERTICAL);
-        layout.setPadding(dp(context, 20), dp(context, 14), dp(context, 20), dp(context, 20));
+        layout.setPadding(dp(context, 10), dp(context, 10), dp(context, 10), dp(context, 16));
 
         final String activeTheme = alertManager.getTheme();
         AlertDialog[] dialogHolder = new AlertDialog[1];
         Map<String, Bitmap> thumbCache = new HashMap<>();
 
-        // Buat baris kartu secara modular (3 item per baris) agar bebas scroll dan 100% responsif D-pad remote
+        // 3 kolom, lebar kartu diperkecil dari 192dp ke 154dp (thumbnail 144dp) agar pas di lebar dialog TV
         int total = themeSet.length;
         for (int i = 0; i < total; i += 3) {
             LinearLayout row = new LinearLayout(context);
@@ -355,26 +355,26 @@ public final class SettingsDialog {
                     LinearLayout card = new LinearLayout(context);
                     card.setOrientation(LinearLayout.VERTICAL);
                     card.setGravity(Gravity.CENTER_HORIZONTAL);
-                    card.setPadding(dp(context, 6), dp(context, 6), dp(context, 6), dp(context, 8));
+                    card.setPadding(dp(context, 5), dp(context, 5), dp(context, 5), dp(context, 6));
                     card.setFocusable(true);
 
                     GradientDrawable cardBg = new GradientDrawable();
-                    cardBg.setCornerRadius(dp(context, 10));
+                    cardBg.setCornerRadius(dp(context, 8));
                     cardBg.setColor(isSelected ? 0x4D2EA043 : 0x33161B22);
                     cardBg.setStroke(dp(context, isSelected ? 2 : 1), isSelected ? 0xFFFFD700 : 0x33FFFFFF);
                     card.setBackground(cardBg);
 
                     ImageView thumbView = new ImageView(context);
-                    thumbView.setLayoutParams(new LinearLayout.LayoutParams(dp(context, 180), dp(context, 102))); // 16:9
+                    thumbView.setLayoutParams(new LinearLayout.LayoutParams(dp(context, 144), dp(context, 81))); // 16:9
                     thumbView.setScaleType(ImageView.ScaleType.CENTER_CROP);
                     card.addView(thumbView);
 
                     TextView labelView = new TextView(context);
                     labelView.setText(name + (isSelected ? "\n✓ AKTIF" : ""));
                     labelView.setTextColor(isSelected ? 0xFFFFD700 : 0xFFFFFFFF);
-                    labelView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
+                    labelView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10);
                     labelView.setGravity(Gravity.CENTER);
-                    labelView.setPadding(0, dp(context, 4), 0, 0);
+                    labelView.setPadding(0, dp(context, 3), 0, 0);
                     card.addView(labelView);
 
                     // Load sample thumbnail
@@ -394,7 +394,7 @@ public final class SettingsDialog {
                     card.setOnFocusChangeListener((v, has) -> {
                         cardBg.setColor(has ? 0x662EA043 : (file.equals(alertManager.getTheme()) ? 0x4D2EA043 : 0x33161B22));
                         cardBg.setStroke(dp(context, 2), has ? 0xFFFFFFFF : (file.equals(alertManager.getTheme()) ? 0xFFFFD700 : 0x33FFFFFF));
-                        v.animate().scaleX(has ? 1.06f : 1f).scaleY(has ? 1.06f : 1f).setDuration(160).start();
+                        v.animate().scaleX(has ? 1.05f : 1f).scaleY(has ? 1.05f : 1f).setDuration(150).start();
                     });
 
                     // KLIK LANGSUNG MENERAPKAN TEMA
@@ -405,20 +405,20 @@ public final class SettingsDialog {
                         show(context, prayerEngine, alertManager, listener);
                     });
 
-                    LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(dp(context, 192), -2);
-                    cardLp.setMargins(dp(context, 6), 0, dp(context, 6), 0);
+                    LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(dp(context, 154), -2);
+                    cardLp.setMargins(dp(context, 4), 0, dp(context, 4), 0);
                     row.addView(card, cardLp);
                 } else {
                     // Spacer agar rata
                     View spacer = new View(context);
-                    LinearLayout.LayoutParams spacerLp = new LinearLayout.LayoutParams(dp(context, 192), -2);
-                    spacerLp.setMargins(dp(context, 6), 0, dp(context, 6), 0);
+                    LinearLayout.LayoutParams spacerLp = new LinearLayout.LayoutParams(dp(context, 154), -2);
+                    spacerLp.setMargins(dp(context, 4), 0, dp(context, 4), 0);
                     row.addView(spacer, spacerLp);
                 }
             }
 
             LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(-1, -2);
-            rowLp.setMargins(0, 0, 0, dp(context, 12));
+            rowLp.setMargins(0, 0, 0, dp(context, 10));
             layout.addView(row, rowLp);
         }
 
