@@ -1,11 +1,8 @@
 package com.ardith.sholattv;
 
-import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
-import android.content.Intent;
-import android.net.Uri;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.ViewGroup;
@@ -50,57 +47,69 @@ public final class SettingsDialog {
                 "ℹ️ Dibuat oleh: ardith666 (Contributor)"
         };
 
-        new AlertDialog.Builder(context, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+        AlertDialog[] dialogHolder = new AlertDialog[1];
+
+        AlertDialog dialog = new AlertDialog.Builder(context, android.R.style.Theme_DeviceDefault_Dialog_Alert)
                 .setTitle("Pengaturan Jadwal Sholat TV")
-                .setItems(options, (dialog, which) -> {
+                .setItems(options, (d, which) -> {
                     switch (which) {
                         case 0:
-                            showCityPicker(context, prayerEngine, listener);
+                            showCityPicker(context, prayerEngine, alertManager, listener);
                             break;
                         case 1:
-                            showThemePicker(context, alertManager, listener);
+                            showThemePicker(context, prayerEngine, alertManager, listener);
                             break;
                         case 2:
                             if (listener != null) listener.onPickImageFromGallery();
                             break;
                         case 3:
-                            showSoundPicker(context, alertManager, listener);
+                            showSoundPicker(context, prayerEngine, alertManager, listener);
                             break;
                         case 4:
                             alertManager.setCountdownEnabled(!alertManager.isCountdownEnabled());
                             if (listener != null) listener.onPreferencesChanged();
+                            show(context, prayerEngine, alertManager, listener);
                             break;
                         case 5:
                             alertManager.setCountdownAudioEnabled(!alertManager.isCountdownAudioEnabled());
                             if (listener != null) listener.onPreferencesChanged();
+                            show(context, prayerEngine, alertManager, listener);
                             break;
                         case 6:
                             alertManager.setKeepAwake(!alertManager.isKeepAwake());
                             if (listener != null) listener.onPreferencesChanged();
+                            show(context, prayerEngine, alertManager, listener);
                             break;
                         case 7:
                             alertManager.setShowArab(!alertManager.isShowArab());
                             if (listener != null) listener.onPreferencesChanged();
+                            show(context, prayerEngine, alertManager, listener);
                             break;
                         case 8:
                             alertManager.setShowLatin(!alertManager.isShowLatin());
                             if (listener != null) listener.onPreferencesChanged();
+                            show(context, prayerEngine, alertManager, listener);
                             break;
                         case 9:
                             alertManager.setShowTranslation(!alertManager.isShowTranslation());
                             if (listener != null) listener.onPreferencesChanged();
+                            show(context, prayerEngine, alertManager, listener);
                             break;
                         case 10:
                             new AlertDialog.Builder(context, android.R.style.Theme_DeviceDefault_Dialog_Alert)
                                     .setTitle("Tentang Aplikasi")
                                     .setMessage("Jadwal Sholat TV v1.2\n\nDibuat oleh: ardith666\nGitHub: github.com/ardith666/jadwal-sholat-tv\n\nFitur lengkap: Kiosk ambient, 30 background (20 foto masjid & 10 motif), audio countdown 30s/20s/10-0s, custom gallery, zero background RAM usage.")
-                                    .setPositiveButton("Tutup", null)
+                                    .setPositiveButton("Tutup", (diag, w) -> show(context, prayerEngine, alertManager, listener))
+                                    .setOnCancelListener(diag -> show(context, prayerEngine, alertManager, listener))
                                     .show();
                             break;
                     }
                 })
                 .setNegativeButton("Tutup", null)
-                .show();
+                .create();
+
+        dialogHolder[0] = dialog;
+        dialog.show();
     }
 
     private static String getSoundLabel(String mode) {
@@ -154,7 +163,7 @@ public final class SettingsDialog {
         return "Foto Malam Kauno Mosque";
     }
 
-    private static void showThemePicker(Context context, AlertManager alertManager, OnSettingsChangeListener listener) {
+    private static void showThemePicker(Context context, PrayerEngine prayerEngine, AlertManager alertManager, OnSettingsChangeListener listener) {
         String[] names = new String[THEMES.length];
         int selected = 0;
         String cur = alertManager.getTheme();
@@ -169,12 +178,14 @@ public final class SettingsDialog {
                     alertManager.setTheme(THEMES[which][0]);
                     dialog.dismiss();
                     if (listener != null) listener.onThemeChanged();
+                    show(context, prayerEngine, alertManager, listener);
                 })
-                .setNegativeButton("Batal", null)
+                .setNegativeButton("Kembali", (dialog, which) -> show(context, prayerEngine, alertManager, listener))
+                .setOnCancelListener(dialog -> show(context, prayerEngine, alertManager, listener))
                 .show();
     }
 
-    private static void showSoundPicker(Context context, AlertManager alertManager, OnSettingsChangeListener listener) {
+    private static void showSoundPicker(Context context, PrayerEngine prayerEngine, AlertManager alertManager, OnSettingsChangeListener listener) {
         String[] modes = new String[]{"Adzan Merdu", "Beep Pendek", "Hening (Visual Saja)"};
         final String[] keys = new String[]{AlertManager.MODE_ADZAN, AlertManager.MODE_BEEP, AlertManager.MODE_SILENT};
 
@@ -190,14 +201,19 @@ public final class SettingsDialog {
                     alertManager.setSoundMode(keys[which]);
                     dialog.dismiss();
                     if (listener != null) listener.onPreferencesChanged();
+                    show(context, prayerEngine, alertManager, listener);
                 })
-                .setNegativeButton("Batal", null)
+                .setNegativeButton("Kembali", (dialog, which) -> show(context, prayerEngine, alertManager, listener))
+                .setOnCancelListener(dialog -> show(context, prayerEngine, alertManager, listener))
                 .show();
     }
 
-    private static void showCityPicker(Context context, PrayerEngine prayerEngine, OnSettingsChangeListener listener) {
+    private static void showCityPicker(Context context, PrayerEngine prayerEngine, AlertManager alertManager, OnSettingsChangeListener listener) {
         List<PrayerEngine.City> allCities = prayerEngine.loadCities();
-        if (allCities.isEmpty()) return;
+        if (allCities.isEmpty()) {
+            show(context, prayerEngine, alertManager, listener);
+            return;
+        }
 
         Collections.sort(allCities, (a, b) -> a.name.compareToIgnoreCase(b.name));
 
@@ -225,7 +241,8 @@ public final class SettingsDialog {
         AlertDialog dialog = new AlertDialog.Builder(context, android.R.style.Theme_DeviceDefault_Dialog_Alert)
                 .setTitle("Pilih Kota / Kabupaten (Urut A-Z)")
                 .setView(layout)
-                .setNegativeButton("Batal", null)
+                .setNegativeButton("Kembali", (d, which) -> show(context, prayerEngine, alertManager, listener))
+                .setOnCancelListener(d -> show(context, prayerEngine, alertManager, listener))
                 .create();
 
         searchBox.addTextChangedListener(new TextWatcher() {
@@ -252,6 +269,7 @@ public final class SettingsDialog {
                 prayerEngine.setCity(selected.id, selected.name);
                 dialog.dismiss();
                 if (listener != null) listener.onLocationChanged();
+                show(context, prayerEngine, alertManager, listener);
             }
         });
 
