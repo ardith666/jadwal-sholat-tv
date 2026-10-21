@@ -27,20 +27,31 @@ import android.widget.Toast;
 
 import java.io.InputStream;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
-public class MainActivity extends Activity implements SettingsDialog.OnSettingsChangeListener {
+public class MainActivity extends Activity implements SettingsDialog.OnSettingsChangeListener, WebServerManager.OnWebUpdateListener {
     private static final String TAG = "MainActivity";
 
     private PrayerEngine prayerEngine;
     private QuranEngine quranEngine;
     private AlertManager alertManager;
+    private SlideManager slideManager;
+    private WebServerManager webServerManager;
 
     private ImageView bgImageView;
     private View scrimOverlay;
+
+    // Multi-Slide Container
+    private FrameLayout sliderContainer;
+    private LinearLayout prayerSlideView; // Slide 1 (Jadwal Sholat & Quran)
+    private View customSlideView; // Slide aktif lainnya (Kas, Pengumuman, Image)
+    private int currentSlideIndex = 0;
+    private List<SlideModel> activeSlides = new ArrayList<>();
+    private boolean isAdzanApproaching = false;
 
     private TextView clockText;
     private TextView dateText;
@@ -48,6 +59,7 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
     private TextView settingsBtn;
     private TextView countdownBanner;
     private TextView creditText;
+    private TextView versionText;
 
     private LinearLayout prayerCardsRow;
     private FrameLayout quranCardContainer;
@@ -82,6 +94,14 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
         }
     };
 
+    private final Runnable slideNextRunnable = new Runnable() {
+        @Override
+        public void run() {
+            if (!isActivityActive) return;
+            advanceToNextSlide();
+        }
+    };
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -89,8 +109,11 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
         prayerEngine = new PrayerEngine(this);
         quranEngine = new QuranEngine(this);
         alertManager = new AlertManager(this);
+        slideManager = new SlideManager(this);
+        webServerManager = new WebServerManager(this, slideManager, prayerEngine, alertManager, this);
 
         buildUI();
+        refreshSlidesList();
     }
 
     @Override
@@ -100,12 +123,19 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
         applyKeepAwake();
         applyTheme();
 
+        // Jalankan Web Server lokal (port 8080)
+        if (webServerManager != null) {
+            webServerManager.start();
+        }
+
         loadScheduleAsync();
         handler.removeCallbacks(timerTick);
         handler.removeCallbacks(quranRotation);
         handler.post(timerTick);
         handler.postDelayed(quranRotation, 3000);
-        Log.i(TAG, "onResume: active, timer & rotation started");
+
+        scheduleNextSlide();
+        updateFooterIpText();
 
         // Cek update otomatis di background jika diaktifkan (default: ON)
         if (alertManager != null && alertManager.isAutoUpdateCheckEnabled()) {
@@ -124,13 +154,14 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
     protected void onPause() {
         super.onPause();
         isActivityActive = false;
-        // ZERO BACKGROUND RESOURCE FOOTPRINT: stop all callbacks and audio
+        // ZERO BACKGROUND RESOURCE FOOTPRINT
         handler.removeCallbacksAndMessages(null);
+        if (webServerManager != null) {
+            webServerManager.stop();
+        }
         if (alertManager != null) {
             alertManager.stopAudio();
         }
-        // Release background image bitmap if needed
-        Log.i(TAG, "onPause: paused, stopped all handlers and audio to preserve RAM");
     }
 
     @Override
@@ -138,6 +169,9 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
         super.onStop();
         isActivityActive = false;
         handler.removeCallbacksAndMessages(null);
+        if (webServerManager != null) {
+            webServerManager.stop();
+        }
         if (alertManager != null) {
             alertManager.stopAudio();
         }
@@ -160,9 +194,7 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
                     bgImageView.setImageBitmap(bmp);
                     return;
                 }
-            } catch (Exception e) {
-                Log.w(TAG, "Failed loading custom image uri, fallback to bundled theme: " + e.getMessage());
-            }
+            } catch (Exception ignored) {}
         }
 
         String themeFile = alertManager.getTheme();
@@ -186,7 +218,7 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
         bgImageView.setScaleType(ImageView.ScaleType.CENTER_CROP);
         rootLayout.addView(bgImageView);
 
-        // Scrim Overlay to ensure text readability on all themes
+        // Scrim Overlay
         scrimOverlay = new View(this);
         scrimOverlay.setLayoutParams(new FrameLayout.LayoutParams(-1, -1));
         scrimOverlay.setBackgroundColor(0x99000000);
@@ -195,7 +227,7 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
         // Main Foreground Content
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
-        content.setPadding(dp(36), dp(22), dp(36), dp(18));
+        content.setPadding(dp(36), dp(20), dp(36), dp(16));
         content.setLayoutParams(new FrameLayout.LayoutParams(-1, -1));
 
         // 1. HEADER (Jam, Tanggal, Lokasi, Tombol Settings)
@@ -229,7 +261,7 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
         rightHeader.addView(locationBadge, llp(-2, dp(38), 0, 0, dp(12), 0));
 
         settingsBtn = pill("⚙ Pengaturan");
-        settingsBtn.setOnClickListener(v -> SettingsDialog.show(this, prayerEngine, alertManager, this));
+        settingsBtn.setOnClickListener(v -> SettingsDialog.show(this, prayerEngine, alertManager, slideManager, this));
         rightHeader.addView(settingsBtn, llp(-2, dp(38), 0, 0, 0, 0));
 
         header.addView(rightHeader, new LinearLayout.LayoutParams(-2, -2));
@@ -241,25 +273,32 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
         countdownBanner.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
         countdownBanner.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
         countdownBanner.setGravity(Gravity.CENTER);
-        countdownBanner.setPadding(0, dp(8), 0, dp(4));
+        countdownBanner.setPadding(0, dp(6), 0, dp(2));
         countdownBanner.setVisibility(View.GONE);
         content.addView(countdownBanner, new LinearLayout.LayoutParams(-1, -2));
 
-        // 3. PRAYER CARDS ROW (5 Waktu Sholat + Imsak + Dhuha)
+        // 3. SLIDER CONTAINER (Multi-Slide Layout)
+        sliderContainer = new FrameLayout(this);
+        sliderContainer.setLayoutParams(new LinearLayout.LayoutParams(-1, 0, 1f));
+
+        // Build Slide 1: Prayer Cards + Quran
+        prayerSlideView = new LinearLayout(this);
+        prayerSlideView.setOrientation(LinearLayout.VERTICAL);
+        prayerSlideView.setLayoutParams(new FrameLayout.LayoutParams(-1, -1));
+
         prayerCardsRow = new LinearLayout(this);
         prayerCardsRow.setOrientation(LinearLayout.HORIZONTAL);
         prayerCardsRow.setGravity(Gravity.CENTER);
-        prayerCardsRow.setPadding(0, dp(14), 0, dp(14));
-        content.addView(prayerCardsRow, new LinearLayout.LayoutParams(-1, -2));
+        prayerCardsRow.setPadding(0, dp(12), 0, dp(12));
+        prayerSlideView.addView(prayerCardsRow, new LinearLayout.LayoutParams(-1, -2));
 
-        // 4. QURAN BANNER CAROUSEL (Bawah)
         quranCardContainer = new FrameLayout(this);
         GradientDrawable quranBg = new GradientDrawable();
         quranBg.setCornerRadius(dp(16));
         quranBg.setColor(0x40000000);
         quranBg.setStroke(dp(1), 0x33FFFFFF);
         quranCardContainer.setBackground(quranBg);
-        quranCardContainer.setPadding(dp(24), dp(16), dp(24), dp(14));
+        quranCardContainer.setPadding(dp(24), dp(14), dp(24), dp(12));
 
         LinearLayout quranContent = new LinearLayout(this);
         quranContent.setOrientation(LinearLayout.VERTICAL);
@@ -293,16 +332,18 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
         quranContent.addView(quranTransText, llp(-1, -2, 0, 0, 0, 0));
 
         quranCardContainer.addView(quranContent, new FrameLayout.LayoutParams(-1, -2, Gravity.CENTER));
-        content.addView(quranCardContainer, new LinearLayout.LayoutParams(-1, 0, 1f));
+        prayerSlideView.addView(quranCardContainer, new LinearLayout.LayoutParams(-1, 0, 1f));
 
-        // 5. FOOTER (Kiri: Versi & Tanggal Rilis | Kanan: Dibuat oleh : ardith666)
+        sliderContainer.addView(prayerSlideView);
+        content.addView(sliderContainer);
+
+        // 4. FOOTER (Kiri: Versi & IP Web Admin | Kanan: Dibuat oleh : ardith666)
         LinearLayout footer = new LinearLayout(this);
         footer.setOrientation(LinearLayout.HORIZONTAL);
         footer.setGravity(Gravity.CENTER_VERTICAL);
         footer.setPadding(0, dp(6), dp(4), 0);
 
-        TextView versionText = new TextView(this);
-        versionText.setText("v1.3 (Rilis: 21 Okt 2026)");
+        versionText = new TextView(this);
         versionText.setTextColor(0x80FFFFFF);
         versionText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
         versionText.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
@@ -321,6 +362,12 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
         rootLayout.addView(content);
         setContentView(rootLayout);
         rotateQuranVerse();
+    }
+
+    private void updateFooterIpText() {
+        String ip = NetworkUtils.getLocalIpAddress(this);
+        versionText.setText(String.format("v1.4 | 🌐 Web Admin: http://%s:%d (PIN: %s)",
+                ip, WebServerManager.PORT, slideManager.getAdminPin()));
     }
 
     private TextView pill(String label) {
@@ -347,6 +394,81 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
         return p;
     }
 
+    // ==========================================
+    // MULTI-SLIDE CAROUSEL LOGIC
+    // ==========================================
+    private void refreshSlidesList() {
+        activeSlides = slideManager.getEnabledSlides();
+        currentSlideIndex = 0;
+        showSlideAt(0);
+    }
+
+    private void scheduleNextSlide() {
+        handler.removeCallbacks(slideNextRunnable);
+        if (activeSlides.size() <= 1) return;
+
+        // Jangan ganti slide jika adzan sedang mendekat (< 5 menit)
+        if (isAdzanApproaching) return;
+
+        SlideModel current = activeSlides.get(currentSlideIndex % activeSlides.size());
+        int delayMs = Math.max(5, current.durationSec) * 1000;
+        handler.postDelayed(slideNextRunnable, delayMs);
+    }
+
+    private void advanceToNextSlide() {
+        if (activeSlides.size() <= 1 || isAdzanApproaching) return;
+        currentSlideIndex = (currentSlideIndex + 1) % activeSlides.size();
+        showSlideAt(currentSlideIndex);
+        scheduleNextSlide();
+    }
+
+    private void showSlideAt(int idx) {
+        if (activeSlides.isEmpty()) return;
+        SlideModel model = activeSlides.get(idx % activeSlides.size());
+
+        AlphaAnimation fadeOut = new AlphaAnimation(1f, 0f);
+        fadeOut.setDuration(260);
+        fadeOut.setAnimationListener(new android.view.animation.Animation.AnimationListener() {
+            @Override public void onAnimationStart(android.view.animation.Animation animation) {}
+            @Override
+            public void onAnimationEnd(android.view.animation.Animation animation) {
+                if (SlideModel.TYPE_PRAYER.equals(model.type)) {
+                    if (customSlideView != null) sliderContainer.removeView(customSlideView);
+                    prayerSlideView.setVisibility(View.VISIBLE);
+                } else {
+                    prayerSlideView.setVisibility(View.GONE);
+                    if (customSlideView != null) sliderContainer.removeView(customSlideView);
+                    customSlideView = SlideViewBuilder.buildSlideView(MainActivity.this, model, slideManager);
+                    sliderContainer.addView(customSlideView);
+                }
+                AlphaAnimation fadeIn = new AlphaAnimation(0f, 1f);
+                fadeIn.setDuration(320);
+                sliderContainer.startAnimation(fadeIn);
+            }
+            @Override public void onAnimationRepeat(android.view.animation.Animation animation) {}
+        });
+
+        sliderContainer.startAnimation(fadeOut);
+    }
+
+    @Override
+    public boolean onKeyDown(int keyCode, KeyEvent event) {
+        // Navigasi manual slide remote D-pad Kiri / Kanan
+        if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT && activeSlides.size() > 1) {
+            currentSlideIndex = (currentSlideIndex - 1 + activeSlides.size()) % activeSlides.size();
+            showSlideAt(currentSlideIndex);
+            scheduleNextSlide();
+            return true;
+        } else if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT && activeSlides.size() > 1) {
+            advanceToNextSlide();
+            return true;
+        }
+        return super.onKeyDown(keyCode, event);
+    }
+
+    // ==========================================
+    // PRAYER ENGINE & CLOCK
+    // ==========================================
     private void loadScheduleAsync() {
         new Thread(() -> {
             PrayerEngine.DaySchedule ds = prayerEngine.getTodaySchedule();
@@ -451,6 +573,12 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
         // Check countdown (< 5 menit = 300 detik)
         PrayerEngine.Slot nextSlot = slots.get(highlightedSlotIndex);
         if (nextDiffSec > 0 && nextDiffSec <= 300 && alertManager.isCountdownEnabled()) {
+            isAdzanApproaching = true;
+            // Lock screen pada Slide Jadwal Sholat
+            if (customSlideView != null && prayerSlideView.getVisibility() != View.VISIBLE) {
+                showSlideAt(0);
+            }
+
             int m = nextDiffSec / 60;
             int s = nextDiffSec % 60;
             countdownBanner.setVisibility(View.VISIBLE);
@@ -465,6 +593,10 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
             }
         } else {
             countdownBanner.setVisibility(View.GONE);
+            if (isAdzanApproaching && nextDiffSec > 300) {
+                isAdzanApproaching = false;
+                scheduleNextSlide();
+            }
         }
 
         // Trigger alert adzan tepat pada waktu sholat (detik 0)
@@ -523,6 +655,9 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
         quranCardContainer.startAnimation(fadeOut);
     }
 
+    // ==========================================
+    // LISTENER CALLBACKS
+    // ==========================================
     @Override
     public void onLocationChanged() {
         locationBadge.setText("📍 " + prayerEngine.getCityName());
@@ -556,6 +691,23 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
     }
 
     @Override
+    public void onSlidesUpdated() {
+        refreshSlidesList();
+        Toast.makeText(this, "Slide diperbarui via Web Admin", Toast.LENGTH_SHORT).show();
+    }
+
+    @Override
+    public void onSettingsUpdated() {
+        locationBadge.setText("📍 " + prayerEngine.getCityName());
+        loadScheduleAsync();
+        applyKeepAwake();
+        applyTheme();
+        rotateQuranVerse();
+        updateFooterIpText();
+        Toast.makeText(this, "Pengaturan diperbarui via Web Admin", Toast.LENGTH_SHORT).show();
+    }
+
+    @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == SettingsDialog.REQUEST_CODE_PICK_IMAGE && resultCode == RESULT_OK && data != null) {
@@ -573,6 +725,9 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
         super.onDestroy();
         isActivityActive = false;
         handler.removeCallbacksAndMessages(null);
+        if (webServerManager != null) {
+            webServerManager.stop();
+        }
         if (alertManager != null) alertManager.stopAudio();
     }
 

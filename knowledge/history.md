@@ -59,3 +59,17 @@
     - Menampilkan popup dialog konfirmasi jika versi baru tersedia (beserta catatan rilis & tombol langsung unduh APK)
     - Opsi tombol manual "Cek Pembaruan Versi Aplikasi" dan toggle ON/OFF di menu pengaturan
   - Status: ✅ Teruji di TV TCL (Screenshots: backup/tcl-31-settings-v13-update-checker.png, backup/tcl-32-manual-update-dialog.png) & terpublikasi di GitHub (Commit b4c5208)
+
+- [2026-10-21 09:25] Tampilan Versi & Tanggal Rilis di Footer Layar Utama:
+  - Menambahkan informasi `v1.3 (Rilis: 21 Okt 2026)` di pojok kiri bawah layar utama, berdampingan dengan `Dibuat oleh : ardith666` di pojok kanan bawah
+  - Status: ✅ Teruji di TV TCL (Screenshot: backup/tcl-33-version-release-date-footer.png) & dipush ke GitHub (Commit 806d677)
+
+- [2026-10-21 09:45] Rilis v1.4 - Multi-Slide Kiosk Display & Embedded Web Server Admin:
+  - Multi-Slide Carousel: Layar utama mendukung perputaran slide otomatis (Jadwal Sholat & Quran, Laporan Kas Masjid, Pengumuman Agenda, Poster Gambar)
+  - Default: Hanya 1 slide aktif (Jadwal Sholat), template Kas & Pengumuman siap diaktifkan via Web Admin
+  - Interupsi Cerdas: Saat countdown adzan aktif (< 5 menit), slider otomatis terkunci di slide jadwal sholat
+  - Embedded Web Server: Port 8080 (aman dan tidak bentrok dengan Chromecast/ADB TV), melayani Single Page App Admin responsif
+  - Keamanan PIN: Default PIN `1989` (terdokumentasi di README.md dan dapat diubah lewat web)
+  - Banner Informasi Web Admin: Menampilkan URL `http://IP:8080` dan PIN default di menu pengaturan TV serta footer layar utama
+  - Zero Background Footprint: Web Server dan Socket di-stop di `onPause()` saat aplikasi diminimalkan
+  - Status: ✅ Teruji di TV TCL (Screenshots: backup/tcl-34, tcl-35, tcl-36, tcl-37) & di-push ke GitHub repo ardith666/jadwal-sholat-tv

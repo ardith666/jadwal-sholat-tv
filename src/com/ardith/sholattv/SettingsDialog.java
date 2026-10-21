@@ -93,7 +93,7 @@ public final class SettingsDialog {
         return "Kauno Mosque Malam";
     }
 
-    public static void show(Context context, PrayerEngine prayerEngine, AlertManager alertManager, OnSettingsChangeListener listener) {
+    public static void show(Context context, PrayerEngine prayerEngine, AlertManager alertManager, SlideManager slideManager, OnSettingsChangeListener listener) {
         ScrollView scroll = new ScrollView(context);
         scroll.setLayoutParams(new ViewGroup.LayoutParams(-1, -1));
 
@@ -165,7 +165,47 @@ public final class SettingsDialog {
         root.addView(supportCard, new LinearLayout.LayoutParams(-1, -2));
 
         // Click QRIS card to view enlarged QRIS
-        supportCard.setOnClickListener(v -> showEnlargedQris(context, prayerEngine, alertManager, listener));
+        supportCard.setOnClickListener(v -> showEnlargedQris(context, prayerEngine, alertManager, slideManager, listener));
+
+        // ==========================================
+        // 1B. BANNER WEB ADMIN & IP PORT INFO
+        // ==========================================
+        String localIp = NetworkUtils.getLocalIpAddress(context);
+        LinearLayout webAdminCard = new LinearLayout(context);
+        webAdminCard.setOrientation(LinearLayout.VERTICAL);
+        webAdminCard.setPadding(dp(context, 18), dp(context, 14), dp(context, 18), dp(context, 14));
+        webAdminCard.setFocusable(true);
+
+        GradientDrawable webBg = new GradientDrawable();
+        webBg.setCornerRadius(dp(context, 14));
+        webBg.setColor(0x331F6FEB);
+        webBg.setStroke(dp(context, 1), 0x6658A6FF);
+        webAdminCard.setBackground(webBg);
+
+        webAdminCard.setOnFocusChangeListener((v, has) -> {
+            webBg.setStroke(dp(context, 2), has ? 0xFFFFD700 : 0x6658A6FF);
+            webBg.setColor(has ? 0x4D1F6FEB : 0x331F6FEB);
+            v.animate().scaleX(has ? 1.02f : 1f).scaleY(has ? 1.02f : 1f).setDuration(160).start();
+        });
+
+        TextView webTitle = new TextView(context);
+        webTitle.setText("🌐 Web Admin (Atur Slider, Kas & Gambar via HP/PC)");
+        webTitle.setTextColor(0xFF58A6FF);
+        webTitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+        webTitle.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+        webAdminCard.addView(webTitle);
+
+        TextView webUrl = new TextView(context);
+        webUrl.setText(String.format("Alamat: http://%s:%d\nPIN Default: %s (Koneksikan HP ke Wi-Fi yang sama)",
+                localIp, WebServerManager.PORT, slideManager.getAdminPin()));
+        webUrl.setTextColor(0xFFFFFFFF);
+        webUrl.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+        webUrl.setPadding(0, dp(context, 4), 0, 0);
+        webAdminCard.addView(webUrl);
+
+        LinearLayout.LayoutParams webLp = new LinearLayout.LayoutParams(-1, -2);
+        webLp.setMargins(0, dp(context, 12), 0, 0);
+        root.addView(webAdminCard, webLp);
 
         // Spacing divider
         View div = new View(context);
@@ -205,28 +245,27 @@ public final class SettingsDialog {
                 dialogHolder[0].dismiss();
                 switch (index) {
                     case 0:
-                        showCityPicker(context, prayerEngine, alertManager, listener);
+                        showCityPicker(context, prayerEngine, alertManager, slideManager, listener);
                         break;
                     case 1:
-                        showGalleryPicker(context, prayerEngine, alertManager, listener, false); // Gelap
+                        showGalleryPicker(context, prayerEngine, alertManager, slideManager, listener, false); // Gelap
                         break;
                     case 2:
-                        showGalleryPicker(context, prayerEngine, alertManager, listener, true);  // Terang
+                        showGalleryPicker(context, prayerEngine, alertManager, slideManager, listener, true);  // Terang
                         break;
                     case 3:
                         if (listener != null) listener.onPickImageFromGallery();
                         break;
                     case 4:
-                        // Cek pembaruan manual
                         UpdateChecker.check(context, true, (updateAvailable, latestTag, downloadUrl, notes) -> {
                             if (updateAvailable) {
                                 UpdateChecker.showUpdateDialog(context, latestTag, downloadUrl, notes);
                             } else {
                                 new AlertDialog.Builder(context, android.R.style.Theme_DeviceDefault_Dialog_Alert)
                                         .setTitle("Pembaruan Aplikasi")
-                                        .setMessage("Aplikasi Anda sudah menggunakan versi terbaru (v1.3).")
-                                        .setPositiveButton("OK", (d, w) -> show(context, prayerEngine, alertManager, listener))
-                                        .setOnCancelListener(d -> show(context, prayerEngine, alertManager, listener))
+                                        .setMessage("Aplikasi Anda sudah menggunakan versi terbaru (v1.4).")
+                                        .setPositiveButton("OK", (d, w) -> show(context, prayerEngine, alertManager, slideManager, listener))
+                                        .setOnCancelListener(d -> show(context, prayerEngine, alertManager, slideManager, listener))
                                         .show();
                             }
                         });
@@ -234,40 +273,40 @@ public final class SettingsDialog {
                     case 5:
                         alertManager.setAutoUpdateCheckEnabled(!alertManager.isAutoUpdateCheckEnabled());
                         if (listener != null) listener.onPreferencesChanged();
-                        show(context, prayerEngine, alertManager, listener);
+                        show(context, prayerEngine, alertManager, slideManager, listener);
                         break;
                     case 6:
-                        showSoundPicker(context, prayerEngine, alertManager, listener);
+                        showSoundPicker(context, prayerEngine, alertManager, slideManager, listener);
                         break;
                     case 7:
                         alertManager.setCountdownEnabled(!alertManager.isCountdownEnabled());
                         if (listener != null) listener.onPreferencesChanged();
-                        show(context, prayerEngine, alertManager, listener);
+                        show(context, prayerEngine, alertManager, slideManager, listener);
                         break;
                     case 8:
                         alertManager.setCountdownAudioEnabled(!alertManager.isCountdownAudioEnabled());
                         if (listener != null) listener.onPreferencesChanged();
-                        show(context, prayerEngine, alertManager, listener);
+                        show(context, prayerEngine, alertManager, slideManager, listener);
                         break;
                     case 9:
                         alertManager.setKeepAwake(!alertManager.isKeepAwake());
                         if (listener != null) listener.onPreferencesChanged();
-                        show(context, prayerEngine, alertManager, listener);
+                        show(context, prayerEngine, alertManager, slideManager, listener);
                         break;
                     case 10:
                         alertManager.setShowArab(!alertManager.isShowArab());
                         if (listener != null) listener.onPreferencesChanged();
-                        show(context, prayerEngine, alertManager, listener);
+                        show(context, prayerEngine, alertManager, slideManager, listener);
                         break;
                     case 11:
                         alertManager.setShowLatin(!alertManager.isShowLatin());
                         if (listener != null) listener.onPreferencesChanged();
-                        show(context, prayerEngine, alertManager, listener);
+                        show(context, prayerEngine, alertManager, slideManager, listener);
                         break;
                     case 12:
                         alertManager.setShowTranslation(!alertManager.isShowTranslation());
                         if (listener != null) listener.onPreferencesChanged();
-                        show(context, prayerEngine, alertManager, listener);
+                        show(context, prayerEngine, alertManager, slideManager, listener);
                         break;
                 }
             });
@@ -309,7 +348,7 @@ public final class SettingsDialog {
         return tv;
     }
 
-    private static void showEnlargedQris(Context context, PrayerEngine pe, AlertManager am, OnSettingsChangeListener l) {
+    private static void showEnlargedQris(Context context, PrayerEngine pe, AlertManager am, SlideManager sm, OnSettingsChangeListener l) {
         LinearLayout layout = new LinearLayout(context);
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setGravity(Gravity.CENTER);
@@ -337,15 +376,15 @@ public final class SettingsDialog {
         new AlertDialog.Builder(context, android.R.style.Theme_DeviceDefault_Dialog_Alert)
                 .setTitle("Infaq & Dukungan Developer")
                 .setView(layout)
-                .setPositiveButton("Kembali", (dialog, which) -> show(context, pe, am, l))
-                .setOnCancelListener(dialog -> show(context, pe, am, l))
+                .setPositiveButton("Kembali", (dialog, which) -> show(context, pe, am, sm, l))
+                .setOnCancelListener(dialog -> show(context, pe, am, sm, l))
                 .show();
     }
 
     // ==========================================
     // 3. GALLERY THUMBNAIL PICKER (GELAP / TERANG)
     // ==========================================
-    private static void showGalleryPicker(Context context, PrayerEngine prayerEngine, AlertManager alertManager, OnSettingsChangeListener listener, boolean isLight) {
+    private static void showGalleryPicker(Context context, PrayerEngine prayerEngine, AlertManager alertManager, SlideManager slideManager, OnSettingsChangeListener listener, boolean isLight) {
         final String[][] themeSet = isLight ? LIGHT_THEMES : DARK_THEMES;
         String title = isLight ? "☀️ Koleksi Tema Terang (15 Pilihan)" : "🌙 Koleksi Tema Gelap (15 Pilihan)";
 
@@ -360,7 +399,6 @@ public final class SettingsDialog {
         AlertDialog[] dialogHolder = new AlertDialog[1];
         Map<String, Bitmap> thumbCache = new HashMap<>();
 
-        // 3 kolom, lebar kartu diperkecil dari 192dp ke 154dp (thumbnail 144dp) agar pas di lebar dialog TV
         int total = themeSet.length;
         for (int i = 0; i < total; i += 3) {
             LinearLayout row = new LinearLayout(context);
@@ -399,7 +437,6 @@ public final class SettingsDialog {
                     labelView.setPadding(0, dp(context, 3), 0, 0);
                     card.addView(labelView);
 
-                    // Load sample thumbnail
                     Bitmap thumb = thumbCache.get(file);
                     if (thumb == null) {
                         try (InputStream in = context.getAssets().open("backgrounds/" + file)) {
@@ -419,19 +456,17 @@ public final class SettingsDialog {
                         v.animate().scaleX(has ? 1.05f : 1f).scaleY(has ? 1.05f : 1f).setDuration(150).start();
                     });
 
-                    // KLIK LANGSUNG MENERAPKAN TEMA
                     card.setOnClickListener(v -> {
                         alertManager.setTheme(file);
                         if (dialogHolder[0] != null) dialogHolder[0].dismiss();
                         if (listener != null) listener.onThemeChanged();
-                        show(context, prayerEngine, alertManager, listener);
+                        show(context, prayerEngine, alertManager, slideManager, listener);
                     });
 
                     LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(dp(context, 154), -2);
                     cardLp.setMargins(dp(context, 4), 0, dp(context, 4), 0);
                     row.addView(card, cardLp);
                 } else {
-                    // Spacer agar rata
                     View spacer = new View(context);
                     LinearLayout.LayoutParams spacerLp = new LinearLayout.LayoutParams(dp(context, 154), -2);
                     spacerLp.setMargins(dp(context, 4), 0, dp(context, 4), 0);
@@ -449,8 +484,8 @@ public final class SettingsDialog {
         AlertDialog dialog = new AlertDialog.Builder(context, android.R.style.Theme_DeviceDefault_Dialog_Alert)
                 .setTitle(title)
                 .setView(scroll)
-                .setNegativeButton("Kembali", (d, which) -> show(context, prayerEngine, alertManager, listener))
-                .setOnCancelListener(d -> show(context, prayerEngine, alertManager, listener))
+                .setNegativeButton("Kembali", (d, which) -> show(context, prayerEngine, alertManager, slideManager, listener))
+                .setOnCancelListener(d -> show(context, prayerEngine, alertManager, slideManager, listener))
                 .create();
 
         dialogHolder[0] = dialog;
@@ -463,7 +498,7 @@ public final class SettingsDialog {
         return "Adzan Merdu";
     }
 
-    private static void showSoundPicker(Context context, PrayerEngine prayerEngine, AlertManager alertManager, OnSettingsChangeListener listener) {
+    private static void showSoundPicker(Context context, PrayerEngine prayerEngine, AlertManager alertManager, SlideManager slideManager, OnSettingsChangeListener listener) {
         String[] modes = new String[]{"Adzan Merdu", "Beep Pendek", "Hening (Visual Saja)"};
         final String[] keys = new String[]{AlertManager.MODE_ADZAN, AlertManager.MODE_BEEP, AlertManager.MODE_SILENT};
 
@@ -479,17 +514,17 @@ public final class SettingsDialog {
                     alertManager.setSoundMode(keys[which]);
                     dialog.dismiss();
                     if (listener != null) listener.onPreferencesChanged();
-                    show(context, prayerEngine, alertManager, listener);
+                    show(context, prayerEngine, alertManager, slideManager, listener);
                 })
-                .setNegativeButton("Kembali", (dialog, which) -> show(context, prayerEngine, alertManager, listener))
-                .setOnCancelListener(dialog -> show(context, prayerEngine, alertManager, listener))
+                .setNegativeButton("Kembali", (dialog, which) -> show(context, prayerEngine, alertManager, slideManager, listener))
+                .setOnCancelListener(dialog -> show(context, prayerEngine, alertManager, slideManager, listener))
                 .show();
     }
 
-    private static void showCityPicker(Context context, PrayerEngine prayerEngine, AlertManager alertManager, OnSettingsChangeListener listener) {
+    private static void showCityPicker(Context context, PrayerEngine prayerEngine, AlertManager alertManager, SlideManager slideManager, OnSettingsChangeListener listener) {
         List<PrayerEngine.City> allCities = prayerEngine.loadCities();
         if (allCities.isEmpty()) {
-            show(context, prayerEngine, alertManager, listener);
+            show(context, prayerEngine, alertManager, slideManager, listener);
             return;
         }
 
@@ -519,8 +554,8 @@ public final class SettingsDialog {
         AlertDialog dialog = new AlertDialog.Builder(context, android.R.style.Theme_DeviceDefault_Dialog_Alert)
                 .setTitle("Pilih Kota / Kabupaten (Urut A-Z)")
                 .setView(layout)
-                .setNegativeButton("Kembali", (d, which) -> show(context, prayerEngine, alertManager, listener))
-                .setOnCancelListener(d -> show(context, prayerEngine, alertManager, listener))
+                .setNegativeButton("Kembali", (d, which) -> show(context, prayerEngine, alertManager, slideManager, listener))
+                .setOnCancelListener(d -> show(context, prayerEngine, alertManager, slideManager, listener))
                 .create();
 
         searchBox.addTextChangedListener(new TextWatcher() {
@@ -547,7 +582,7 @@ public final class SettingsDialog {
                 prayerEngine.setCity(selected.id, selected.name);
                 dialog.dismiss();
                 if (listener != null) listener.onLocationChanged();
-                show(context, prayerEngine, alertManager, listener);
+                show(context, prayerEngine, alertManager, slideManager, listener);
             }
         });
 

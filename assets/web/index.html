@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jadwal Sholat TV — Administrator Panel</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- PIN LOGIN MODAL -->
+  <div id="loginModal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-icon">🕌</div>
+      <h2>Jadwal Sholat TV</h2>
+      <p class="subtitle">Administrator Control Panel</p>
+      <form id="loginForm">
+        <div class="form-group">
+          <label for="pinInput">Masukkan PIN Administrator</label>
+          <input type="password" id="pinInput" placeholder="Default PIN: 1989" maxlength="12" required autofocus>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Masuk ke Panel</button>
+      </form>
+      <p class="hint">PIN bawaan pabrik adalah <b>1989</b> dan dapat diganti di pengaturan.</p>
+    </div>
+  </div>
+
+  <!-- MAIN ADMIN APP -->
+  <div id="appContainer" class="app-layout hidden">
+    <!-- SIDEBAR / NAV -->
+    <header class="navbar">
+      <div class="brand">
+        <span class="brand-icon">🕌</span>
+        <div>
+          <h1>Jadwal Sholat TV</h1>
+          <span class="badge-status" id="tvStatus">Terhubung ke TV</span>
+        </div>
+      </div>
+      <div class="nav-actions">
+        <button id="logoutBtn" class="btn btn-outline-danger">Keluar</button>
+      </div>
+    </header>
+
+    <div class="main-body">
+      <!-- TABS NAVIGATION -->
+      <nav class="tabs">
+        <button class="tab-btn active" data-tab="tab-slides">📺 Manajemen Slider TV</button>
+        <button class="tab-btn" data-tab="tab-settings">⚙ Pengaturan Jadwal & Suara</button>
+        <button class="tab-btn" data-tab="tab-pin">🔒 Ganti PIN</button>
+      </nav>
+
+      <!-- TAB 1: SLIDER MANAGEMENT -->
+      <section id="tab-slides" class="tab-content active">
+        <div class="section-header">
+          <div>
+            <h2>Konten Layar Multi-Slide TV</h2>
+            <p class="section-desc">Atur konten apa saja yang berputar di layar TV. Slide 1 (Jadwal Sholat) adalah slide inti.</p>
+          </div>
+          <button id="addNewSlideBtn" class="btn btn-success">+ Tambah Slide Baru</button>
+        </div>
+
+        <div id="slidesList" class="slides-grid">
+          <!-- Rendered dynamically via app.js -->
+        </div>
+      </section>
+
+      <!-- TAB 2: PRAYER & DISPLAY SETTINGS -->
+      <section id="tab-settings" class="tab-content">
+        <div class="section-header">
+          <h2>Pengaturan Sistem TV</h2>
+          <p class="section-desc">Atur lokasi kota hisab sholat, tema background, suara alert, dan tampilan teks Al-Qur'an.</p>
+        </div>
+
+        <form id="settingsForm" class="settings-form">
+          <div class="card">
+            <h3>📍 Lokasi Hisab Kemenag</h3>
+            <div class="form-group">
+              <label for="citySelect">Pilih Kota / Kabupaten (518 Kota)</label>
+              <select id="citySelect" class="form-control"></select>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>🖼 Tema Background TV</h3>
+            <div class="form-group">
+              <label for="themeSelect">Pilih Tema Background (20 Foto Masjid + 10 Motif)</label>
+              <select id="themeSelect" class="form-control"></select>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>🔔 Suara & Notifikasi Sholat</h3>
+            <div class="form-row">
+              <div class="form-group col">
+                <label for="soundSelect">Pilihan Suara Masuk Waktu</label>
+                <select id="soundSelect" class="form-control">
+                  <option value="adzan">Adzan Merdu (Lokal)</option>
+                  <option value="beep">Beep Singkat</option>
+                  <option value="silent">Hening (Visual Saja)</option>
+                </select>
+              </div>
+              <div class="form-group col">
+                <label>Fitur Hitung Mundur</label>
+                <div class="checkbox-group">
+                  <label><input type="checkbox" id="chkCountdown"> Countdown 5 Menit</label>
+                  <label><input type="checkbox" id="chkCountdownAudio"> Beep Peringatan (30s, 20s, 10-0s)</label>
+                  <label><input type="checkbox" id="chkKeepAwake"> Layar Selalu ON (Anti-Sleep TV)</label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>📖 Tampilan Ayat Al-Qur'an</h3>
+            <div class="checkbox-group horizontal">
+              <label><input type="checkbox" id="chkShowArab"> Teks Arab Utsmani</label>
+              <label><input type="checkbox" id="chkShowLatin"> Transliterasi Latin</label>
+              <label><input type="checkbox" id="chkShowTrans"> Terjemahan Kemenag RI</label>
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-lg">Simpan Pengaturan TV</button>
+        </form>
+      </section>
+
+      <!-- TAB 3: PIN SECURITY -->
+      <section id="tab-pin" class="tab-content">
+        <div class="section-header">
+          <h2>Keamanan Administrator</h2>
+          <p class="section-desc">Ganti PIN untuk membatasi akses pengelolaan TV masjid.</p>
+        </div>
+
+        <div class="card max-w-md">
+          <form id="changePinForm">
+            <div class="form-group">
+              <label for="newPin">PIN Baru (Angka atau Huruf, maks 12 karakter)</label>
+              <input type="password" id="newPin" class="form-control" placeholder="Contoh: 2026" required>
+            </div>
+            <div class="form-group">
+              <label for="confirmPin">Konfirmasi PIN Baru</label>
+              <input type="password" id="confirmPin" class="form-control" placeholder="Ulangi PIN baru" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Ubah PIN Sekarang</button>
+          </form>
+        </div>
+      </section>
+    </div>
+
+    <!-- MODAL SLIDE EDITOR -->
+    <div id="slideEditorModal" class="modal-overlay hidden">
+      <div class="modal-card modal-lg">
+        <h3 id="editorTitle">Edit Slide</h3>
+        <form id="slideForm">
+          <input type="hidden" id="slideId">
+
+          <div class="form-row">
+            <div class="form-group col">
+              <label for="slideType">Tipe Slide</label>
+              <select id="slideType" class="form-control">
+                <option value="PRAYER">Jadwal Sholat & Al-Qur'an (Inti)</option>
+                <option value="KAS">Laporan Kas & Keuangan Masjid</option>
+                <option value="ANNOUNCEMENT">Agenda & Pengumuman Teks</option>
+                <option value="IMAGE">Poster Gambar / Flyer Kajian</option>
+              </select>
+            </div>
+            <div class="form-group col">
+              <label for="slideDuration">Durasi Tampil di Layar (Detik)</label>
+              <input type="number" id="slideDuration" class="form-control" min="5" max="300" value="30" required>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="slideName">Judul Slide</label>
+            <input type="text" id="slideName" class="form-control" placeholder="Contoh: Laporan Kas Kasih Masjid" required>
+          </div>
+
+          <div class="form-group">
+            <label class="switch-label">
+              <input type="checkbox" id="slideEnabled" checked>
+              <span>Aktifkan Slide ini di Layar TV</span>
+            </label>
+          </div>
+
+          <!-- DYNAMIC FIELDS: KAS -->
+          <div id="fieldsKas" class="dynamic-section hidden">
+            <h4>💰 Data Keuangan Masjid</h4>
+            <div class="form-row">
+              <div class="form-group col">
+                <label for="kasSaldoAwal">Saldo Awal (Rp)</label>
+                <input type="number" id="kasSaldoAwal" class="form-control" placeholder="0">
+              </div>
+              <div class="form-group col">
+                <label for="kasPemasukan">Penerimaan Infaq (Rp)</label>
+                <input type="number" id="kasPemasukan" class="form-control" placeholder="0">
+              </div>
+              <div class="form-group col">
+                <label for="kasPengeluaran">Pengeluaran Operasional (Rp)</label>
+                <input type="number" id="kasPengeluaran" class="form-control" placeholder="0">
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="kasCatatan">Keterangan / Rincian Singkat</label>
+              <input type="text" id="kasCatatan" class="form-control" placeholder="Contoh: Kotak Infaq Jumat & Pembayaran Listrik">
+            </div>
+          </div>
+
+          <!-- DYNAMIC FIELDS: ANNOUNCEMENT -->
+          <div id="fieldsAnnouncement" class="dynamic-section hidden">
+            <h4>📢 Isi Pengumuman & Agenda</h4>
+            <div class="form-group">
+              <label for="agendaWaktu">Waktu / Jadwal Pelaksanaan</label>
+              <input type="text" id="agendaWaktu" class="form-control" placeholder="Contoh: Ahad Pagi, 06.00 - 07.30 WIB">
+            </div>
+            <div class="form-group">
+              <label for="agendaNarasumber">Penyelenggara / Penceramah</label>
+              <input type="text" id="agendaNarasumber" class="form-control" placeholder="Contoh: Ust. Fulan bin Fulan / DKM Masjid">
+            </div>
+            <div class="form-group">
+              <label for="agendaTeks">Uraian Pengumuman</label>
+              <textarea id="agendaTeks" class="form-control" rows="4" placeholder="Tuliskan pengumuman kegiatan atau himbauan masjid di sini..."></textarea>
+            </div>
+          </div>
+
+          <!-- DYNAMIC FIELDS: IMAGE POSTER -->
+          <div id="fieldsImage" class="dynamic-section hidden">
+            <h4>🖼 Upload Poster Flyer (JPG/PNG)</h4>
+            <div class="form-group">
+              <label for="posterFile">Pilih Gambar Poster dari HP / Komputer</label>
+              <input type="file" id="posterFile" class="form-control" accept="image/jpeg,image/png">
+            </div>
+            <div id="posterPreview" class="image-preview hidden"></div>
+          </div>
+
+          <div class="modal-footer">
+            <button type="button" id="closeEditorBtn" class="btn btn-secondary">Batal</button>
+            <button type="submit" class="btn btn-primary">Simpan Perubahan Slide</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
