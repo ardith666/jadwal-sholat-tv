@@ -370,13 +370,14 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
         footer.setPadding(0, dp(6), dp(4), 0);
 
         versionText = new TextView(this);
+        versionText.setText("v1.5 (Rilis: 21 Okt 2026)");
         versionText.setTextColor(0x80FFFFFF);
         versionText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
         versionText.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
         footer.addView(versionText, new LinearLayout.LayoutParams(0, -2, 1f));
 
         creditText = new TextView(this);
-        creditText.setText("Dibuat oleh : ardith666");
+        creditText.setText("Dibuat oleh : https://github.com/ardith666");
         creditText.setTextColor(0x80FFFFFF);
         creditText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
         creditText.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
@@ -391,9 +392,8 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
     }
 
     private void updateFooterIpText() {
-        String ip = NetworkUtils.getLocalIpAddress(this);
-        versionText.setText(String.format("v1.5 | 🌐 Web Admin: http://%s:%d (PIN: %s)",
-                ip, WebServerManager.PORT, slideManager.getAdminPin()));
+        // Tampilkan versi & tanggal build saja di pojok kiri bawah (keterangan IP cukup di Pengaturan)
+        versionText.setText("v1.5 (Rilis: 21 Okt 2026)");
     }
 
     private TextView pill(String label) {
