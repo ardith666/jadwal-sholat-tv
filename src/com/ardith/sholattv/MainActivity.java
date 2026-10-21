@@ -1,12 +1,16 @@
 package com.ardith.sholattv;
 
 import android.app.Activity;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.Log;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.KeyEvent;
@@ -16,10 +20,12 @@ import android.view.WindowManager;
 import android.view.animation.AlphaAnimation;
 import android.view.animation.OvershootInterpolator;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.io.InputStream;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
@@ -27,16 +33,21 @@ import java.util.List;
 import java.util.Locale;
 
 public class MainActivity extends Activity implements SettingsDialog.OnSettingsChangeListener {
+    private static final String TAG = "MainActivity";
 
     private PrayerEngine prayerEngine;
     private QuranEngine quranEngine;
     private AlertManager alertManager;
+
+    private ImageView bgImageView;
+    private View scrimOverlay;
 
     private TextView clockText;
     private TextView dateText;
     private TextView locationBadge;
     private TextView settingsBtn;
     private TextView countdownBanner;
+    private TextView creditText;
 
     private LinearLayout prayerCardsRow;
     private FrameLayout quranCardContainer;
@@ -63,7 +74,7 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
         @Override
         public void run() {
             rotateQuranVerse();
-            handler.postDelayed(this, 25000); // Ganti ayat setiap 25 detik
+            handler.postDelayed(this, 25000);
         }
     };
 
@@ -77,6 +88,7 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
 
         applyKeepAwake();
         buildUI();
+        applyTheme();
 
         loadScheduleAsync();
         handler.post(timerTick);
@@ -91,11 +103,39 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
         }
     }
 
+    private void applyTheme() {
+        String themeFile = alertManager.getTheme();
+        try (InputStream in = getAssets().open("backgrounds/" + themeFile)) {
+            Bitmap bmp = BitmapFactory.decodeStream(in);
+            if (bmp != null) {
+                bgImageView.setImageBitmap(bmp);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error loading background: " + themeFile, e);
+        }
+    }
+
     private void buildUI() {
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(0xFF0D1117);
-        root.setPadding(dp(36), dp(24), dp(36), dp(24));
+        FrameLayout rootLayout = new FrameLayout(this);
+        rootLayout.setLayoutParams(new ViewGroup.LayoutParams(-1, -1));
+
+        // Background Image View
+        bgImageView = new ImageView(this);
+        bgImageView.setLayoutParams(new FrameLayout.LayoutParams(-1, -1));
+        bgImageView.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        rootLayout.addView(bgImageView);
+
+        // Scrim Overlay to ensure text readability on all themes
+        scrimOverlay = new View(this);
+        scrimOverlay.setLayoutParams(new FrameLayout.LayoutParams(-1, -1));
+        scrimOverlay.setBackgroundColor(0x99000000);
+        rootLayout.addView(scrimOverlay);
+
+        // Main Foreground Content
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(36), dp(22), dp(36), dp(18));
+        content.setLayoutParams(new FrameLayout.LayoutParams(-1, -1));
 
         // 1. HEADER (Jam, Tanggal, Lokasi, Tombol Settings)
         LinearLayout header = new LinearLayout(this);
@@ -113,7 +153,7 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
         leftHeader.addView(clockText);
 
         dateText = new TextView(this);
-        dateText.setTextColor(0x99FFFFFF);
+        dateText.setTextColor(0xB3FFFFFF);
         dateText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
         dateText.setText("Memuat tanggal...");
         leftHeader.addView(dateText);
@@ -132,7 +172,7 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
         rightHeader.addView(settingsBtn, llp(-2, dp(38), 0, 0, 0, 0));
 
         header.addView(rightHeader, new LinearLayout.LayoutParams(-2, -2));
-        root.addView(header, new LinearLayout.LayoutParams(-1, -2));
+        content.addView(header, new LinearLayout.LayoutParams(-1, -2));
 
         // 2. COUNTDOWN BANNER (Muncul jika < 5 menit sebelum masuk sholat)
         countdownBanner = new TextView(this);
@@ -140,25 +180,25 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
         countdownBanner.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
         countdownBanner.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
         countdownBanner.setGravity(Gravity.CENTER);
-        countdownBanner.setPadding(0, dp(10), 0, dp(4));
+        countdownBanner.setPadding(0, dp(8), 0, dp(4));
         countdownBanner.setVisibility(View.GONE);
-        root.addView(countdownBanner, new LinearLayout.LayoutParams(-1, -2));
+        content.addView(countdownBanner, new LinearLayout.LayoutParams(-1, -2));
 
         // 3. PRAYER CARDS ROW (5 Waktu Sholat + Imsak + Dhuha)
         prayerCardsRow = new LinearLayout(this);
         prayerCardsRow.setOrientation(LinearLayout.HORIZONTAL);
         prayerCardsRow.setGravity(Gravity.CENTER);
-        prayerCardsRow.setPadding(0, dp(16), 0, dp(16));
-        root.addView(prayerCardsRow, new LinearLayout.LayoutParams(-1, -2));
+        prayerCardsRow.setPadding(0, dp(14), 0, dp(14));
+        content.addView(prayerCardsRow, new LinearLayout.LayoutParams(-1, -2));
 
         // 4. QURAN BANNER CAROUSEL (Bawah)
         quranCardContainer = new FrameLayout(this);
         GradientDrawable quranBg = new GradientDrawable();
         quranBg.setCornerRadius(dp(16));
-        quranBg.setColor(0x33161B22);
-        quranBg.setStroke(dp(1), 0x26FFFFFF);
+        quranBg.setColor(0x40000000);
+        quranBg.setStroke(dp(1), 0x33FFFFFF);
         quranCardContainer.setBackground(quranBg);
-        quranCardContainer.setPadding(dp(24), dp(18), dp(24), dp(18));
+        quranCardContainer.setPadding(dp(24), dp(16), dp(24), dp(14));
 
         LinearLayout quranContent = new LinearLayout(this);
         quranContent.setOrientation(LinearLayout.VERTICAL);
@@ -169,21 +209,21 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
         quranRefText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
         quranRefText.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
         quranRefText.setGravity(Gravity.CENTER);
-        quranContent.addView(quranRefText, llp(-1, -2, 0, 0, 0, dp(8)));
+        quranContent.addView(quranRefText, llp(-1, -2, 0, 0, 0, dp(6)));
 
         quranArabText = new TextView(this);
         quranArabText.setTextColor(0xFFFFFFFF);
         quranArabText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 22);
         quranArabText.setGravity(Gravity.CENTER);
         quranArabText.setLineSpacing(dp(6), 1f);
-        quranContent.addView(quranArabText, llp(-1, -2, 0, 0, 0, dp(8)));
+        quranContent.addView(quranArabText, llp(-1, -2, 0, 0, 0, dp(6)));
 
         quranLatinText = new TextView(this);
         quranLatinText.setTextColor(0xCC7EE787);
         quranLatinText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
         quranLatinText.setTypeface(Typeface.create("sans-serif-light", Typeface.ITALIC));
         quranLatinText.setGravity(Gravity.CENTER);
-        quranContent.addView(quranLatinText, llp(-1, -2, 0, 0, 0, dp(6)));
+        quranContent.addView(quranLatinText, llp(-1, -2, 0, 0, 0, dp(4)));
 
         quranTransText = new TextView(this);
         quranTransText.setTextColor(0xE6E6EDF3);
@@ -192,9 +232,20 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
         quranContent.addView(quranTransText, llp(-1, -2, 0, 0, 0, 0));
 
         quranCardContainer.addView(quranContent, new FrameLayout.LayoutParams(-1, -2, Gravity.CENTER));
-        root.addView(quranCardContainer, new LinearLayout.LayoutParams(-1, 0, 1f));
+        content.addView(quranCardContainer, new LinearLayout.LayoutParams(-1, 0, 1f));
 
-        setContentView(root);
+        // 5. FOOTER ATTRIBUTION (Dibuat oleh : ardith666)
+        creditText = new TextView(this);
+        creditText.setText("Dibuat oleh : ardith666");
+        creditText.setTextColor(0x80FFFFFF);
+        creditText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
+        creditText.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
+        creditText.setGravity(Gravity.END);
+        creditText.setPadding(0, dp(6), dp(4), 0);
+        content.addView(creditText, new LinearLayout.LayoutParams(-1, -2));
+
+        rootLayout.addView(content);
+        setContentView(rootLayout);
         rotateQuranVerse();
     }
 
@@ -243,7 +294,7 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
             PrayerEngine.Slot slot = slots.get(i);
             boolean isHighlighted = (i == highlightedSlotIndex);
             View card = createPrayerCard(slot.name, slot.time, isHighlighted);
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(110), 1f);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(106), 1f);
             lp.setMargins(i == 0 ? 0 : dp(8), 0, i == count - 1 ? 0 : dp(8), 0);
             prayerCardsRow.addView(card, lp);
         }
@@ -263,7 +314,7 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
             card.setScaleX(1.04f);
             card.setScaleY(1.04f);
         } else {
-            bg.setColor(0x40161B22);
+            bg.setColor(0x4D161B22);
             bg.setStroke(dp(1), 0x26FFFFFF);
             card.setScaleX(1f);
             card.setScaleY(1f);
@@ -272,7 +323,7 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
 
         TextView n = new TextView(this);
         n.setText(name);
-        n.setTextColor(active ? 0xFFFFD700 : 0x99FFFFFF);
+        n.setTextColor(active ? 0xFFFFD700 : 0xB3FFFFFF);
         n.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
         n.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
         card.addView(n);
@@ -403,6 +454,12 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
         applyKeepAwake();
         rotateQuranVerse();
         Toast.makeText(this, "Pengaturan disimpan", Toast.LENGTH_SHORT).show();
+    }
+
+    @Override
+    public void onThemeChanged() {
+        applyTheme();
+        Toast.makeText(this, "Tema background diubah", Toast.LENGTH_SHORT).show();
     }
 
     @Override

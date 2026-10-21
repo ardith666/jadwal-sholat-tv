@@ -21,6 +21,8 @@ public final class AlertManager {
     public static final String KEY_SHOW_ARAB = "show_arab";
     public static final String KEY_SHOW_LATIN = "show_latin";
     public static final String KEY_SHOW_TRANSLATION = "show_translation";
+    public static final String KEY_THEME = "theme_bg";
+    public static final String DEFAULT_THEME = "01_midnight_kaaba.jpg";
 
     private final Context ctx;
     private MediaPlayer mediaPlayer;
@@ -87,6 +89,16 @@ public final class AlertManager {
     public void setShowTranslation(boolean show) {
         ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                 .edit().putBoolean(KEY_SHOW_TRANSLATION, show).apply();
+    }
+
+    public String getTheme() {
+        return ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .getString(KEY_THEME, DEFAULT_THEME);
+    }
+
+    public void setTheme(String themeFile) {
+        ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit().putString(KEY_THEME, themeFile).apply();
     }
 
     public void playPrayerAlert() {
