@@ -1,0 +1,424 @@
+package com.ardith.sholattv;
+
+import android.app.Activity;
+import android.graphics.Color;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.util.TypedValue;
+import android.view.Gravity;
+import android.view.KeyEvent;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.WindowManager;
+import android.view.animation.AlphaAnimation;
+import android.view.animation.OvershootInterpolator;
+import android.widget.FrameLayout;
+import android.widget.LinearLayout;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.List;
+import java.util.Locale;
+
+public class MainActivity extends Activity implements SettingsDialog.OnSettingsChangeListener {
+
+    private PrayerEngine prayerEngine;
+    private QuranEngine quranEngine;
+    private AlertManager alertManager;
+
+    private TextView clockText;
+    private TextView dateText;
+    private TextView locationBadge;
+    private TextView settingsBtn;
+    private TextView countdownBanner;
+
+    private LinearLayout prayerCardsRow;
+    private FrameLayout quranCardContainer;
+    private TextView quranRefText;
+    private TextView quranArabText;
+    private TextView quranLatinText;
+    private TextView quranTransText;
+
+    private PrayerEngine.DaySchedule currentSchedule;
+    private int highlightedSlotIndex = -1;
+    private int lastAlertTriggeredMinute = -1;
+
+    private final Handler handler = new Handler(Looper.getMainLooper());
+
+    private final Runnable timerTick = new Runnable() {
+        @Override
+        public void run() {
+            updateClockAndSchedule();
+            handler.postDelayed(this, 1000);
+        }
+    };
+
+    private final Runnable quranRotation = new Runnable() {
+        @Override
+        public void run() {
+            rotateQuranVerse();
+            handler.postDelayed(this, 25000); // Ganti ayat setiap 25 detik
+        }
+    };
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+
+        prayerEngine = new PrayerEngine(this);
+        quranEngine = new QuranEngine(this);
+        alertManager = new AlertManager(this);
+
+        applyKeepAwake();
+        buildUI();
+
+        loadScheduleAsync();
+        handler.post(timerTick);
+        handler.postDelayed(quranRotation, 3000);
+    }
+
+    private void applyKeepAwake() {
+        if (alertManager.isKeepAwake()) {
+            getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        } else {
+            getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        }
+    }
+
+    private void buildUI() {
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundColor(0xFF0D1117);
+        root.setPadding(dp(36), dp(24), dp(36), dp(24));
+
+        // 1. HEADER (Jam, Tanggal, Lokasi, Tombol Settings)
+        LinearLayout header = new LinearLayout(this);
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+
+        LinearLayout leftHeader = new LinearLayout(this);
+        leftHeader.setOrientation(LinearLayout.VERTICAL);
+
+        clockText = new TextView(this);
+        clockText.setTextColor(0xFFFFFFFF);
+        clockText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 44);
+        clockText.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        clockText.setText("00:00:00");
+        leftHeader.addView(clockText);
+
+        dateText = new TextView(this);
+        dateText.setTextColor(0x99FFFFFF);
+        dateText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
+        dateText.setText("Memuat tanggal...");
+        leftHeader.addView(dateText);
+
+        header.addView(leftHeader, new LinearLayout.LayoutParams(0, -2, 1f));
+
+        LinearLayout rightHeader = new LinearLayout(this);
+        rightHeader.setOrientation(LinearLayout.HORIZONTAL);
+        rightHeader.setGravity(Gravity.CENTER_VERTICAL);
+
+        locationBadge = pill("📍 " + prayerEngine.getCityName());
+        rightHeader.addView(locationBadge, llp(-2, dp(38), 0, 0, dp(12), 0));
+
+        settingsBtn = pill("⚙ Pengaturan");
+        settingsBtn.setOnClickListener(v -> SettingsDialog.show(this, prayerEngine, alertManager, this));
+        rightHeader.addView(settingsBtn, llp(-2, dp(38), 0, 0, 0, 0));
+
+        header.addView(rightHeader, new LinearLayout.LayoutParams(-2, -2));
+        root.addView(header, new LinearLayout.LayoutParams(-1, -2));
+
+        // 2. COUNTDOWN BANNER (Muncul jika < 5 menit sebelum masuk sholat)
+        countdownBanner = new TextView(this);
+        countdownBanner.setTextColor(0xFFFFD700);
+        countdownBanner.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
+        countdownBanner.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+        countdownBanner.setGravity(Gravity.CENTER);
+        countdownBanner.setPadding(0, dp(10), 0, dp(4));
+        countdownBanner.setVisibility(View.GONE);
+        root.addView(countdownBanner, new LinearLayout.LayoutParams(-1, -2));
+
+        // 3. PRAYER CARDS ROW (5 Waktu Sholat + Imsak + Dhuha)
+        prayerCardsRow = new LinearLayout(this);
+        prayerCardsRow.setOrientation(LinearLayout.HORIZONTAL);
+        prayerCardsRow.setGravity(Gravity.CENTER);
+        prayerCardsRow.setPadding(0, dp(16), 0, dp(16));
+        root.addView(prayerCardsRow, new LinearLayout.LayoutParams(-1, -2));
+
+        // 4. QURAN BANNER CAROUSEL (Bawah)
+        quranCardContainer = new FrameLayout(this);
+        GradientDrawable quranBg = new GradientDrawable();
+        quranBg.setCornerRadius(dp(16));
+        quranBg.setColor(0x33161B22);
+        quranBg.setStroke(dp(1), 0x26FFFFFF);
+        quranCardContainer.setBackground(quranBg);
+        quranCardContainer.setPadding(dp(24), dp(18), dp(24), dp(18));
+
+        LinearLayout quranContent = new LinearLayout(this);
+        quranContent.setOrientation(LinearLayout.VERTICAL);
+        quranContent.setGravity(Gravity.CENTER_HORIZONTAL);
+
+        quranRefText = new TextView(this);
+        quranRefText.setTextColor(0xFFFFD700);
+        quranRefText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
+        quranRefText.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+        quranRefText.setGravity(Gravity.CENTER);
+        quranContent.addView(quranRefText, llp(-1, -2, 0, 0, 0, dp(8)));
+
+        quranArabText = new TextView(this);
+        quranArabText.setTextColor(0xFFFFFFFF);
+        quranArabText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 22);
+        quranArabText.setGravity(Gravity.CENTER);
+        quranArabText.setLineSpacing(dp(6), 1f);
+        quranContent.addView(quranArabText, llp(-1, -2, 0, 0, 0, dp(8)));
+
+        quranLatinText = new TextView(this);
+        quranLatinText.setTextColor(0xCC7EE787);
+        quranLatinText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+        quranLatinText.setTypeface(Typeface.create("sans-serif-light", Typeface.ITALIC));
+        quranLatinText.setGravity(Gravity.CENTER);
+        quranContent.addView(quranLatinText, llp(-1, -2, 0, 0, 0, dp(6)));
+
+        quranTransText = new TextView(this);
+        quranTransText.setTextColor(0xE6E6EDF3);
+        quranTransText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+        quranTransText.setGravity(Gravity.CENTER);
+        quranContent.addView(quranTransText, llp(-1, -2, 0, 0, 0, 0));
+
+        quranCardContainer.addView(quranContent, new FrameLayout.LayoutParams(-1, -2, Gravity.CENTER));
+        root.addView(quranCardContainer, new LinearLayout.LayoutParams(-1, 0, 1f));
+
+        setContentView(root);
+        rotateQuranVerse();
+    }
+
+    private TextView pill(String label) {
+        TextView p = new TextView(this);
+        p.setText(label);
+        p.setTextColor(0xE6FFFFFF);
+        p.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+        p.setGravity(Gravity.CENTER);
+        p.setPadding(dp(16), 0, dp(16), 0);
+        p.setFocusable(true);
+        p.setId(View.generateViewId());
+
+        GradientDrawable bg = new GradientDrawable();
+        bg.setCornerRadius(dp(19));
+        bg.setColor(0x4D161B22);
+        bg.setStroke(dp(1), 0x33FFFFFF);
+        p.setBackground(bg);
+
+        p.setOnFocusChangeListener((v, has) -> {
+            bg.setColor(has ? 0xF2FFFFFF : 0x4D161B22);
+            p.setTextColor(has ? 0xFF0D1117 : 0xE6FFFFFF);
+            v.animate().scaleX(has ? 1.06f : 1f).scaleY(has ? 1.06f : 1f).setDuration(180).start();
+        });
+        return p;
+    }
+
+    private void loadScheduleAsync() {
+        new Thread(() -> {
+            PrayerEngine.DaySchedule ds = prayerEngine.getTodaySchedule();
+            runOnUiThread(() -> {
+                currentSchedule = ds;
+                renderScheduleCards();
+                updateClockAndSchedule();
+            });
+        }).start();
+    }
+
+    private void renderScheduleCards() {
+        if (prayerCardsRow == null || currentSchedule == null) return;
+        prayerCardsRow.removeAllViews();
+
+        List<PrayerEngine.Slot> slots = currentSchedule.slots;
+        int count = slots.size();
+        for (int i = 0; i < count; i++) {
+            PrayerEngine.Slot slot = slots.get(i);
+            boolean isHighlighted = (i == highlightedSlotIndex);
+            View card = createPrayerCard(slot.name, slot.time, isHighlighted);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(110), 1f);
+            lp.setMargins(i == 0 ? 0 : dp(8), 0, i == count - 1 ? 0 : dp(8), 0);
+            prayerCardsRow.addView(card, lp);
+        }
+    }
+
+    private View createPrayerCard(String name, String time, boolean active) {
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setGravity(Gravity.CENTER);
+        card.setPadding(dp(12), dp(10), dp(12), dp(10));
+
+        GradientDrawable bg = new GradientDrawable();
+        bg.setCornerRadius(dp(14));
+        if (active) {
+            bg.setColor(0x662EA043);
+            bg.setStroke(dp(2), 0xFFFFD700);
+            card.setScaleX(1.04f);
+            card.setScaleY(1.04f);
+        } else {
+            bg.setColor(0x40161B22);
+            bg.setStroke(dp(1), 0x26FFFFFF);
+            card.setScaleX(1f);
+            card.setScaleY(1f);
+        }
+        card.setBackground(bg);
+
+        TextView n = new TextView(this);
+        n.setText(name);
+        n.setTextColor(active ? 0xFFFFD700 : 0x99FFFFFF);
+        n.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+        n.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+        card.addView(n);
+
+        TextView t = new TextView(this);
+        t.setText(time);
+        t.setTextColor(0xFFFFFFFF);
+        t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 22);
+        t.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        card.addView(t, llp(-2, -2, 0, dp(6), 0, 0));
+
+        return card;
+    }
+
+    private void updateClockAndSchedule() {
+        Calendar now = Calendar.getInstance();
+        SimpleDateFormat timeFmt = new SimpleDateFormat("HH:mm:ss", Locale.getDefault());
+        clockText.setText(timeFmt.format(now.getTime()));
+
+        SimpleDateFormat dateFmt = new SimpleDateFormat("EEEE, dd MMMM yyyy", new Locale("id", "ID"));
+        dateText.setText(dateFmt.format(now.getTime()));
+
+        if (currentSchedule == null || currentSchedule.slots.isEmpty()) return;
+
+        int nowMin = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE);
+        int nowSec = now.get(Calendar.SECOND);
+
+        int nextIdx = -1;
+        int nextDiffSec = Integer.MAX_VALUE;
+
+        List<PrayerEngine.Slot> slots = currentSchedule.slots;
+        for (int i = 0; i < slots.size(); i++) {
+            PrayerEngine.Slot s = slots.get(i);
+            int slotTotalSec = s.minutes * 60;
+            int currentTotalSec = nowMin * 60 + nowSec;
+            if (slotTotalSec >= currentTotalSec) {
+                nextIdx = i;
+                nextDiffSec = slotTotalSec - currentTotalSec;
+                break;
+            }
+        }
+        if (nextIdx == -1) {
+            nextIdx = 1; // Fallback to Subuh besok
+        }
+
+        if (nextIdx != highlightedSlotIndex) {
+            highlightedSlotIndex = nextIdx;
+            renderScheduleCards();
+        }
+
+        // Check countdown (< 5 menit = 300 detik)
+        PrayerEngine.Slot nextSlot = slots.get(highlightedSlotIndex);
+        if (nextDiffSec > 0 && nextDiffSec <= 300 && alertManager.isCountdownEnabled()) {
+            int m = nextDiffSec / 60;
+            int s = nextDiffSec % 60;
+            countdownBanner.setVisibility(View.VISIBLE);
+            countdownBanner.setText(String.format(Locale.getDefault(),
+                    "⏳ Menuju Waktu %s: -%02d:%02d", nextSlot.name, m, s));
+        } else {
+            countdownBanner.setVisibility(View.GONE);
+        }
+
+        // Trigger alert tepat pada waktu sholat (detik 0)
+        if (nextDiffSec == 0 && nowMin != lastAlertTriggeredMinute) {
+            lastAlertTriggeredMinute = nowMin;
+            onPrayerTimeArrived(nextSlot.name);
+        }
+    }
+
+    private void onPrayerTimeArrived(String prayerName) {
+        countdownBanner.setVisibility(View.VISIBLE);
+        countdownBanner.setText("🔔 Telah Masuk Waktu Sholat " + prayerName + "!");
+        alertManager.playPrayerAlert();
+        Toast.makeText(this, "Waktu Sholat " + prayerName + " Tiba", Toast.LENGTH_LONG).show();
+    }
+
+    private void rotateQuranVerse() {
+        if (quranCardContainer == null) return;
+        QuranEngine.Verse v = quranEngine.getRandomVerse();
+
+        AlphaAnimation fadeOut = new AlphaAnimation(1f, 0f);
+        fadeOut.setDuration(300);
+        fadeOut.setAnimationListener(new android.view.animation.Animation.AnimationListener() {
+            @Override public void onAnimationStart(android.view.animation.Animation animation) {}
+            @Override
+            public void onAnimationEnd(android.view.animation.Animation animation) {
+                quranRefText.setText(v.getReference());
+
+                if (alertManager.isShowArab()) {
+                    quranArabText.setVisibility(View.VISIBLE);
+                    quranArabText.setText(v.arab);
+                } else {
+                    quranArabText.setVisibility(View.GONE);
+                }
+
+                if (alertManager.isShowLatin()) {
+                    quranLatinText.setVisibility(View.VISIBLE);
+                    quranLatinText.setText(v.latin);
+                } else {
+                    quranLatinText.setVisibility(View.GONE);
+                }
+
+                if (alertManager.isShowTranslation()) {
+                    quranTransText.setVisibility(View.VISIBLE);
+                    quranTransText.setText("“" + v.translation + "”");
+                } else {
+                    quranTransText.setVisibility(View.GONE);
+                }
+
+                AlphaAnimation fadeIn = new AlphaAnimation(0f, 1f);
+                fadeIn.setDuration(400);
+                quranCardContainer.startAnimation(fadeIn);
+            }
+            @Override public void onAnimationRepeat(android.view.animation.Animation animation) {}
+        });
+        quranCardContainer.startAnimation(fadeOut);
+    }
+
+    @Override
+    public void onLocationChanged() {
+        locationBadge.setText("📍 " + prayerEngine.getCityName());
+        loadScheduleAsync();
+        Toast.makeText(this, "Lokasi diubah ke " + prayerEngine.getCityName(), Toast.LENGTH_SHORT).show();
+    }
+
+    @Override
+    public void onPreferencesChanged() {
+        applyKeepAwake();
+        rotateQuranVerse();
+        Toast.makeText(this, "Pengaturan disimpan", Toast.LENGTH_SHORT).show();
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        handler.removeCallbacksAndMessages(null);
+        if (alertManager != null) alertManager.stopAudio();
+    }
+
+    private int dp(int v) {
+        return (int) (v * getResources().getDisplayMetrics().density + 0.5f);
+    }
+
+    private LinearLayout.LayoutParams llp(int w, int h, int l, int t, int r, int b) {
+        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(w, h);
+        p.setMargins(l, t, r, b);
+        return p;
+    }
+}
