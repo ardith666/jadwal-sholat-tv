@@ -148,7 +148,7 @@ public final class SettingsDialog {
         textCol.addView(headerTitle);
 
         TextView supportMsg = new TextView(context);
-        supportMsg.setText("Aplikasi ini dibuat tulus sebagai amal jariyah & open source. Jika Anda merasakan manfaatnya dan tergerak untuk menitipkan infaq operasional, silakan scan QRIS di samping. Doa tulus Anda pun adalah dukungan yang amat berharga bagi kami.");
+        supportMsg.setText("Aplikasi ini dibuat tulus sebagai amal jariyah, gratis & open source. Jika Anda merasakan manfaatnya dan tergerak untuk menitipkan infaq operasional, silakan scan QRIS di samping. Doa tulus Anda pun adalah dukungan yang amat berharga bagi kami.");
         supportMsg.setTextColor(0xE6FFFFFF);
         supportMsg.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
         supportMsg.setPadding(0, dp(context, 3), 0, dp(context, 4));
@@ -185,6 +185,8 @@ public final class SettingsDialog {
                 "🌙 Pilih Background Tema GELAP (15 Pilihan)",
                 "☀️ Pilih Background Tema TERANG (15 Pilihan)",
                 "📂 Pilih Background dari Galeri TV",
+                "🔄 Cek Pembaruan Versi Aplikasi",
+                "🚀 Otomatis Cek Update saat Buka: " + (alertManager.isAutoUpdateCheckEnabled() ? "ON" : "OFF"),
                 "🔊 Suara Waktu Sholat: " + getSoundLabel(alertManager.getSoundMode()),
                 "⏱ Hitung Mundur 5 Menit: " + (alertManager.isCountdownEnabled() ? "ON" : "OFF"),
                 "🔔 Suara Beep Countdown (30s, 20s, 10-0s): " + (alertManager.isCountdownAudioEnabled() ? "ON" : "OFF"),
@@ -215,34 +217,54 @@ public final class SettingsDialog {
                         if (listener != null) listener.onPickImageFromGallery();
                         break;
                     case 4:
-                        showSoundPicker(context, prayerEngine, alertManager, listener);
+                        // Cek pembaruan manual
+                        UpdateChecker.check(context, true, (updateAvailable, latestTag, downloadUrl, notes) -> {
+                            if (updateAvailable) {
+                                UpdateChecker.showUpdateDialog(context, latestTag, downloadUrl, notes);
+                            } else {
+                                new AlertDialog.Builder(context, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+                                        .setTitle("Pembaruan Aplikasi")
+                                        .setMessage("Aplikasi Anda sudah menggunakan versi terbaru (v1.3).")
+                                        .setPositiveButton("OK", (d, w) -> show(context, prayerEngine, alertManager, listener))
+                                        .setOnCancelListener(d -> show(context, prayerEngine, alertManager, listener))
+                                        .show();
+                            }
+                        });
                         break;
                     case 5:
-                        alertManager.setCountdownEnabled(!alertManager.isCountdownEnabled());
+                        alertManager.setAutoUpdateCheckEnabled(!alertManager.isAutoUpdateCheckEnabled());
                         if (listener != null) listener.onPreferencesChanged();
                         show(context, prayerEngine, alertManager, listener);
                         break;
                     case 6:
-                        alertManager.setCountdownAudioEnabled(!alertManager.isCountdownAudioEnabled());
-                        if (listener != null) listener.onPreferencesChanged();
-                        show(context, prayerEngine, alertManager, listener);
+                        showSoundPicker(context, prayerEngine, alertManager, listener);
                         break;
                     case 7:
-                        alertManager.setKeepAwake(!alertManager.isKeepAwake());
+                        alertManager.setCountdownEnabled(!alertManager.isCountdownEnabled());
                         if (listener != null) listener.onPreferencesChanged();
                         show(context, prayerEngine, alertManager, listener);
                         break;
                     case 8:
-                        alertManager.setShowArab(!alertManager.isShowArab());
+                        alertManager.setCountdownAudioEnabled(!alertManager.isCountdownAudioEnabled());
                         if (listener != null) listener.onPreferencesChanged();
                         show(context, prayerEngine, alertManager, listener);
                         break;
                     case 9:
-                        alertManager.setShowLatin(!alertManager.isShowLatin());
+                        alertManager.setKeepAwake(!alertManager.isKeepAwake());
                         if (listener != null) listener.onPreferencesChanged();
                         show(context, prayerEngine, alertManager, listener);
                         break;
                     case 10:
+                        alertManager.setShowArab(!alertManager.isShowArab());
+                        if (listener != null) listener.onPreferencesChanged();
+                        show(context, prayerEngine, alertManager, listener);
+                        break;
+                    case 11:
+                        alertManager.setShowLatin(!alertManager.isShowLatin());
+                        if (listener != null) listener.onPreferencesChanged();
+                        show(context, prayerEngine, alertManager, listener);
+                        break;
+                    case 12:
                         alertManager.setShowTranslation(!alertManager.isShowTranslation());
                         if (listener != null) listener.onPreferencesChanged();
                         show(context, prayerEngine, alertManager, listener);

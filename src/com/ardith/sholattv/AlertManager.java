@@ -25,6 +25,7 @@ public final class AlertManager {
     public static final String KEY_THEME = "theme_bg";
     public static final String DEFAULT_THEME = "photo_dark_01.jpg";
     public static final String KEY_CUSTOM_BG_URI = "custom_bg_uri";
+    public static final String KEY_AUTO_UPDATE_CHECK = "auto_update_check";
 
     private final Context ctx;
     private MediaPlayer mediaPlayer;
@@ -102,6 +103,17 @@ public final class AlertManager {
     public void setShowTranslation(boolean show) {
         ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                 .edit().putBoolean(KEY_SHOW_TRANSLATION, show).apply();
+    }
+
+    public boolean isAutoUpdateCheckEnabled() {
+        // Default: TRUE (otomatis cek update saat aplikasi dibuka)
+        return ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .getBoolean(KEY_AUTO_UPDATE_CHECK, true);
+    }
+
+    public void setAutoUpdateCheckEnabled(boolean enabled) {
+        ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit().putBoolean(KEY_AUTO_UPDATE_CHECK, enabled).apply();
     }
 
     public String getTheme() {

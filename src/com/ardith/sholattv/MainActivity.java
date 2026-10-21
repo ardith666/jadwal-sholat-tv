@@ -106,6 +106,18 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
         handler.post(timerTick);
         handler.postDelayed(quranRotation, 3000);
         Log.i(TAG, "onResume: active, timer & rotation started");
+
+        // Cek update otomatis di background jika diaktifkan (default: ON)
+        if (alertManager != null && alertManager.isAutoUpdateCheckEnabled()) {
+            handler.postDelayed(() -> {
+                if (!isActivityActive) return;
+                UpdateChecker.check(this, false, (updateAvailable, latestTag, downloadUrl, notes) -> {
+                    if (updateAvailable && isActivityActive) {
+                        UpdateChecker.showUpdateDialog(this, latestTag, downloadUrl, notes);
+                    }
+                });
+            }, 4000);
+        }
     }
 
     @Override
