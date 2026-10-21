@@ -73,3 +73,10 @@
   - Banner Informasi Web Admin: Menampilkan URL `http://IP:8080` dan PIN default di menu pengaturan TV serta footer layar utama
   - Zero Background Footprint: Web Server dan Socket di-stop di `onPause()` saat aplikasi diminimalkan
   - Status: ✅ Teruji di TV TCL (Screenshots: backup/tcl-34, tcl-35, tcl-36, tcl-37) & di-push ke GitHub repo ardith666/jadwal-sholat-tv
+
+- [2026-10-21 10:05] In-App Direct APK Downloader & Installer (Self-Update):
+  - Mengatasi error "Anda saat ini tidak memiliki aplikasi yang dapat melakukan tindakan ini" akibat ketiadaan browser di Android TV
+  - Ditambahkan downloader HTTP internal dengan ProgressDialog interaktif
+  - Ditambahkan `AppFileProvider` dan permission `REQUEST_INSTALL_PACKAGES`
+  - Begitu unduhan selesai, sistem langsung memicu intent installer bawaan Android (`application/vnd.android.package-archive`)
+  - Status: ✅ Teruji di TV TCL (Screenshot: backup/tcl-38-in-app-update-checked.png) & di-push ke GitHub (Commit e8d4827)

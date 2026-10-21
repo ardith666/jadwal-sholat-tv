@@ -264,6 +264,10 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
         settingsBtn.setOnClickListener(v -> SettingsDialog.show(this, prayerEngine, alertManager, slideManager, this));
         rightHeader.addView(settingsBtn, llp(-2, dp(38), 0, 0, 0, 0));
 
+        // Beri prioritas focusability pada tombol Settings & Location
+        locationBadge.setNextFocusRightId(settingsBtn.getId());
+        settingsBtn.setNextFocusLeftId(locationBadge.getId());
+
         header.addView(rightHeader, new LinearLayout.LayoutParams(-2, -2));
         content.addView(header, new LinearLayout.LayoutParams(-1, -2));
 
@@ -453,16 +457,39 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
 
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
-        // Navigasi manual slide remote D-pad Kiri / Kanan
-        if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT && activeSlides.size() > 1) {
-            currentSlideIndex = (currentSlideIndex - 1 + activeSlides.size()) % activeSlides.size();
-            showSlideAt(currentSlideIndex);
-            scheduleNextSlide();
-            return true;
-        } else if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT && activeSlides.size() > 1) {
-            advanceToNextSlide();
-            return true;
+        // Tombol D-pad ATAS: Langsung arahkan fokus ke tombol Pengaturan jika belum fokus
+        if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
+            if (settingsBtn != null && !settingsBtn.isFocused()) {
+                settingsBtn.requestFocus();
+                return true;
+            }
+        } else if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+            // Tombol D-pad BAWAH: Lepaskan fokus dari header kembali ke konten slider
+            if (settingsBtn != null && settingsBtn.isFocused()) {
+                if (quranCardContainer != null) {
+                    quranCardContainer.requestFocus();
+                    return true;
+                }
+            }
         }
+
+        // Navigasi manual slide remote D-pad Kiri / Kanan
+        // Hanya berganti slide jika fokus BUKAN di tombol Settings atau Location Badge
+        boolean isHeaderFocused = (settingsBtn != null && settingsBtn.isFocused())
+                || (locationBadge != null && locationBadge.isFocused());
+
+        if (!isHeaderFocused) {
+            if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT && activeSlides.size() > 1) {
+                currentSlideIndex = (currentSlideIndex - 1 + activeSlides.size()) % activeSlides.size();
+                showSlideAt(currentSlideIndex);
+                scheduleNextSlide();
+                return true;
+            } else if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT && activeSlides.size() > 1) {
+                advanceToNextSlide();
+                return true;
+            }
+        }
+
         return super.onKeyDown(keyCode, event);
     }
 
