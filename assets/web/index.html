@@ -158,7 +158,9 @@
               <select id="slideType" class="form-control">
                 <option value="PRAYER">Jadwal Sholat & Al-Qur'an (Inti)</option>
                 <option value="KAS">Laporan Kas & Keuangan Masjid</option>
-                <option value="ANNOUNCEMENT">Agenda & Pengumuman Teks</option>
+                <option value="ANNOUNCEMENT">Agenda & Pengumuman (Hero + Daftar 6)</option>
+                <option value="LIVE_STREAM">Live Streaming Kajian / Khotbah (RTSP Single)</option>
+                <option value="CCTV">Multi-Stream CCTV Pengawasan (RTSP Grid)</option>
                 <option value="IMAGE">Poster Gambar / Flyer Kajian</option>
               </select>
             </div>
@@ -203,21 +205,37 @@
             </div>
           </div>
 
-          <!-- DYNAMIC FIELDS: ANNOUNCEMENT -->
+          <!-- DYNAMIC FIELDS: ANNOUNCEMENT (MULTI-AGENDA) -->
           <div id="fieldsAnnouncement" class="dynamic-section hidden">
-            <h4>📢 Isi Pengumuman & Agenda</h4>
-            <div class="form-group">
-              <label for="agendaWaktu">Waktu / Jadwal Pelaksanaan</label>
-              <input type="text" id="agendaWaktu" class="form-control" placeholder="Contoh: Ahad Pagi, 06.00 - 07.30 WIB">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <h4>📢 Daftar Agenda Masjid (Hero + Daftar 6)</h4>
+              <button type="button" id="addAgendaItemBtn" class="btn btn-sm btn-success">+ Tambah Agenda</button>
             </div>
+            <p style="font-size: 11px; color: var(--text-dim); margin-bottom: 12px;">Agenda #1 otomatis tampil sebagai sorotan utama (Slide A), sedangkan agenda #2 s/d #7 tampil di tabel daftar agenda berikutnya (Slide B).</p>
+            <div id="agendaItemsContainer" style="display: flex; flex-direction: column; gap: 10px;"></div>
+          </div>
+
+          <!-- DYNAMIC FIELDS: LIVE STREAM RTSP -->
+          <div id="fieldsLiveStream" class="dynamic-section hidden">
+            <h4>🎤 Siaran Langsung Kajian / Khotbah (RTSP Single)</h4>
             <div class="form-group">
-              <label for="agendaNarasumber">Penyelenggara / Penceramah</label>
-              <input type="text" id="agendaNarasumber" class="form-control" placeholder="Contoh: Ust. Fulan bin Fulan / DKM Masjid">
+              <label for="liveRtspUrl">URL RTSP Kamera Live</label>
+              <input type="text" id="liveRtspUrl" class="form-control" placeholder="rtsp://admin:password@192.168.1.114:554/ch1/main">
             </div>
-            <div class="form-group">
-              <label for="agendaTeks">Uraian Pengumuman</label>
-              <textarea id="agendaTeks" class="form-control" rows="4" placeholder="Tuliskan pengumuman kegiatan atau himbauan masjid di sini..."></textarea>
+            <div class="checkbox-group">
+              <label><input type="checkbox" id="chkLockLive" checked> 🔒 <b>Kunci Layar TV Selama Kajian</b> (Hentikan slider otomatis, tekan tombol Back di remote untuk keluar)</label>
+              <label><input type="checkbox" id="chkAudioLive"> 🔊 Hidupkan Audio Mikrofon Kamera</label>
             </div>
+          </div>
+
+          <!-- DYNAMIC FIELDS: MULTI CCTV RTSP -->
+          <div id="fieldsCctv" class="dynamic-section hidden">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <h4>📹 Multi-Stream CCTV (Grid Dinamis 1-6 Kamera)</h4>
+              <button type="button" id="addCctvStreamBtn" class="btn btn-sm btn-success">+ Tambah Kamera</button>
+            </div>
+            <p style="font-size: 11px; color: var(--text-dim); margin-bottom: 12px;">Masukkan URL RTSP masing-masing kamera pengawasan. Layout grid (1x1, 1x2, 2x2, 2x3) menyesuaikan otomatis.</p>
+            <div id="cctvStreamsContainer" style="display: flex; flex-direction: column; gap: 10px;"></div>
           </div>
 
           <!-- DYNAMIC FIELDS: IMAGE POSTER -->

@@ -33,7 +33,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
-public class MainActivity extends Activity implements SettingsDialog.OnSettingsChangeListener, WebServerManager.OnWebUpdateListener {
+public class MainActivity extends Activity implements SettingsDialog.OnSettingsChangeListener, WebServerManager.OnWebUpdateListener, SlideViewBuilder.StreamHolder {
     private static final String TAG = "MainActivity";
 
     private PrayerEngine prayerEngine;
@@ -48,10 +48,13 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
     // Multi-Slide Container
     private FrameLayout sliderContainer;
     private LinearLayout prayerSlideView; // Slide 1 (Jadwal Sholat & Quran)
-    private View customSlideView; // Slide aktif lainnya (Kas, Pengumuman, Image)
+    private View customSlideView; // Slide aktif lainnya (Kas, Pengumuman, Image, CCTV, Live)
     private int currentSlideIndex = 0;
     private List<SlideModel> activeSlides = new ArrayList<>();
     private boolean isAdzanApproaching = false;
+
+    // Active RTSP VideoViews to stop/release when changing slides
+    private final List<android.widget.VideoView> activeVideoViews = new ArrayList<>();
 
     private TextView clockText;
     private TextView dateText;
@@ -151,11 +154,30 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
     }
 
     @Override
+    public void registerVideoView(android.widget.VideoView vv) {
+        if (vv != null && !activeVideoViews.contains(vv)) {
+            activeVideoViews.add(vv);
+        }
+    }
+
+    private void stopAllVideoStreams() {
+        for (android.widget.VideoView vv : activeVideoViews) {
+            try {
+                if (vv != null) {
+                    vv.stopPlayback();
+                }
+            } catch (Exception ignored) {}
+        }
+        activeVideoViews.clear();
+    }
+
+    @Override
     protected void onPause() {
         super.onPause();
         isActivityActive = false;
         // ZERO BACKGROUND RESOURCE FOOTPRINT
         handler.removeCallbacksAndMessages(null);
+        stopAllVideoStreams();
         if (webServerManager != null) {
             webServerManager.stop();
         }
@@ -370,7 +392,7 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
 
     private void updateFooterIpText() {
         String ip = NetworkUtils.getLocalIpAddress(this);
-        versionText.setText(String.format("v1.4 | 🌐 Web Admin: http://%s:%d (PIN: %s)",
+        versionText.setText(String.format("v1.5 | 🌐 Web Admin: http://%s:%d (PIN: %s)",
                 ip, WebServerManager.PORT, slideManager.getAdminPin()));
     }
 
@@ -415,12 +437,22 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
         if (isAdzanApproaching) return;
 
         SlideModel current = activeSlides.get(currentSlideIndex % activeSlides.size());
+
+        // Jika slide bertipe LIVE_STREAM dan di-lock, jangan otomatis pindah slide
+        if (SlideModel.TYPE_LIVE_STREAM.equals(current.type) && current.isLocked) {
+            Log.i(TAG, "Live Stream slide is locked, pausing automatic slide rotation");
+            return;
+        }
+
         int delayMs = Math.max(5, current.durationSec) * 1000;
         handler.postDelayed(slideNextRunnable, delayMs);
     }
 
     private void advanceToNextSlide() {
         if (activeSlides.size() <= 1 || isAdzanApproaching) return;
+        SlideModel current = activeSlides.get(currentSlideIndex % activeSlides.size());
+        if (SlideModel.TYPE_LIVE_STREAM.equals(current.type) && current.isLocked) return;
+
         currentSlideIndex = (currentSlideIndex + 1) % activeSlides.size();
         showSlideAt(currentSlideIndex);
         scheduleNextSlide();
@@ -428,6 +460,8 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
 
     private void showSlideAt(int idx) {
         if (activeSlides.isEmpty()) return;
+        stopAllVideoStreams();
+
         SlideModel model = activeSlides.get(idx % activeSlides.size());
 
         AlphaAnimation fadeOut = new AlphaAnimation(1f, 0f);
@@ -442,7 +476,7 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
                 } else {
                     prayerSlideView.setVisibility(View.GONE);
                     if (customSlideView != null) sliderContainer.removeView(customSlideView);
-                    customSlideView = SlideViewBuilder.buildSlideView(MainActivity.this, model, slideManager);
+                    customSlideView = SlideViewBuilder.buildSlideView(MainActivity.this, model, slideManager, MainActivity.this);
                     sliderContainer.addView(customSlideView);
                 }
                 AlphaAnimation fadeIn = new AlphaAnimation(0f, 1f);
@@ -457,6 +491,17 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
 
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
+        // Tombol BACK: Jika sedang di slide LIVE_STREAM (baik locked maupun tidak), keluar dari live stream
+        if (keyCode == KeyEvent.KEYCODE_BACK) {
+            if (!activeSlides.isEmpty()) {
+                SlideModel cur = activeSlides.get(currentSlideIndex % activeSlides.size());
+                if (SlideModel.TYPE_LIVE_STREAM.equals(cur.type)) {
+                    exitLiveStream();
+                    return true;
+                }
+            }
+        }
+
         // Tombol D-pad ATAS: Langsung arahkan fokus ke tombol Pengaturan jika belum fokus
         if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
             if (settingsBtn != null && !settingsBtn.isFocused()) {
@@ -491,6 +536,48 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
         }
 
         return super.onKeyDown(keyCode, event);
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (!activeSlides.isEmpty()) {
+            SlideModel cur = activeSlides.get(currentSlideIndex % activeSlides.size());
+            if (SlideModel.TYPE_LIVE_STREAM.equals(cur.type)) {
+                exitLiveStream();
+                return;
+            }
+        }
+        super.onBackPressed();
+    }
+
+    private void exitLiveStream() {
+        Toast.makeText(this, "Siaran Live ditutup. Kembali ke jadwal normal.", Toast.LENGTH_SHORT).show();
+        stopAllVideoStreams();
+
+        // 1. Nonaktifkan lock pada live stream di memory & file json
+        for (SlideModel s : slideManager.getAllSlides()) {
+            if (SlideModel.TYPE_LIVE_STREAM.equals(s.type)) {
+                s.isLocked = false;
+                s.enabled = false; // Matikan live agar tidak kembali looping ke live
+            }
+        }
+        slideManager.persist();
+
+        // 2. Reload daftar slide aktif
+        activeSlides = slideManager.getEnabledSlides();
+
+        // 3. Cari index slide Jadwal Sholat (PRAYER)
+        int prayerIdx = 0;
+        for (int i = 0; i < activeSlides.size(); i++) {
+            if (SlideModel.TYPE_PRAYER.equals(activeSlides.get(i).type)) {
+                prayerIdx = i;
+                break;
+            }
+        }
+
+        currentSlideIndex = prayerIdx;
+        showSlideAt(currentSlideIndex);
+        scheduleNextSlide();
     }
 
     // ==========================================

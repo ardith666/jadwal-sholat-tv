@@ -80,3 +80,9 @@
   - Ditambahkan `AppFileProvider` dan permission `REQUEST_INSTALL_PACKAGES`
   - Begitu unduhan selesai, sistem langsung memicu intent installer bawaan Android (`application/vnd.android.package-archive`)
   - Status: ✅ Teruji di TV TCL (Screenshot: backup/tcl-38-in-app-update-checked.png) & di-push ke GitHub (Commit e8d4827)
+
+- [2026-10-21 10:20] Fix Navigasi D-Pad Remote TV:
+  - Masalah: Remote TV sebelumnya hanya merespons Kiri/Kanan untuk slider sehingga tombol Atas tidak bisa fokus ke Pengaturan
+  - Solusi: Menambahkan explicit interceptor pada `onKeyDown(KEYCODE_DPAD_UP)` untuk langsung memberikan fokus ke `settingsBtn.requestFocus()`
+  - Tombol Kiri/Kanan dibatasi hanya mengganti slide jika header Pengaturan sedang tidak dalam keadaan fokus
+  - Status: ✅ Teruji di TV TCL (Screenshots: backup/tcl-39-settings-focused-dpad-up.png, backup/tcl-40-settings-opened-by-dpad.png) & di-push ke GitHub (Commit 86037ff)

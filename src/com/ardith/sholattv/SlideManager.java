@@ -45,16 +45,40 @@ public final class SlideManager {
         return new ArrayList<>(slides);
     }
 
+    /**
+     * Menghasilkan daftar slide aktif untuk ditampilkan di carousel TV.
+     * Jika ada slide ANNOUNCEMENT dengan multi-agenda (> 1 item), otomatis dipecah menjadi 2 slide:
+     * 1. Slide Agenda Terdekat (Hero)
+     * 2. Slide Daftar 6 Agenda Berikutnya
+     */
     public synchronized List<SlideModel> getEnabledSlides() {
         List<SlideModel> res = new ArrayList<>();
         for (SlideModel s : slides) {
-            if (s.enabled) res.add(s);
+            if (s.enabled) {
+                if (SlideModel.TYPE_ANNOUNCEMENT.equals(s.type) && s.agendaList != null && s.agendaList.size() > 1) {
+                    // Slide A: Agenda Terdekat (Hero)
+                    SlideModel hero = cloneSlide(s);
+                    hero.agendaDisplayMode = 0;
+                    res.add(hero);
+
+                    // Slide B: Daftar 6 Agenda Berikutnya
+                    SlideModel list = cloneSlide(s);
+                    list.agendaDisplayMode = 1;
+                    res.add(list);
+                } else {
+                    res.add(s);
+                }
+            }
         }
         if (res.isEmpty() && !slides.isEmpty()) {
-            // Minimal slide 1 (Jadwal Sholat) selalu tampil jika semua dinonaktifkan
             res.add(slides.get(0));
         }
         return res;
+    }
+
+    private SlideModel cloneSlide(SlideModel src) {
+        JSONObject obj = src.toJsonObject();
+        return SlideModel.fromJsonObject(obj);
     }
 
     public synchronized void saveSlides(List<SlideModel> newSlides) {
@@ -70,11 +94,17 @@ public final class SlideManager {
 
     public synchronized void deleteSlide(String id) {
         if ("slide_prayer_core".equals(id)) {
-            // Slide utama jadwal sholat tidak boleh dihapus, hanya bisa diatur
             return;
         }
         slides.removeIf(s -> s.id.equals(id));
         persist();
+    }
+
+    public synchronized SlideModel getSlideById(String id) {
+        for (SlideModel s : slides) {
+            if (s.id.equals(id)) return s;
+        }
+        return null;
     }
 
     private synchronized void load() {
@@ -105,22 +135,39 @@ public final class SlideManager {
         // Slide 1: Jadwal Sholat & Quran (DEFAULT AKTIF)
         SlideModel s1 = new SlideModel("slide_prayer_core", SlideModel.TYPE_PRAYER, "Jadwal Sholat & Al-Qur'an", true, 45);
 
-        // Slide 2: Template Kas Masjid (DEFAULT NON-AKTIF, SIAP DIAKTIFKAN VIA WEB ADMIN)
+        // Slide 2: Template Kas Masjid (DEFAULT NON-AKTIF)
         SlideModel s2 = new SlideModel("slide_kas_masjid", SlideModel.TYPE_KAS, "Laporan Keuangan & Kas Masjid", false, 25);
         s2.saldoAwal = 12500000;
         s2.pemasukan = 4250000;
         s2.pengeluaran = 1850000;
         s2.catatanKas = "Pemasukan Infaq Kotak Jumat & Operasional Kebersihan Masjid";
 
-        // Slide 3: Template Pengumuman Kajian (DEFAULT NON-AKTIF, SIAP DIAKTIFKAN VIA WEB ADMIN)
+        // Slide 3: Template Agenda Kajian Multi-Item (DEFAULT NON-AKTIF)
         SlideModel s3 = new SlideModel("slide_agenda_kajian", SlideModel.TYPE_ANNOUNCEMENT, "Agenda Kajian & Pengumuman", false, 25);
-        s3.pengumumanTeks = "Kajian Rutin Ahad Pagi: Membedah Kitab Riyadhus Shalihin bersama Ust. Fulan bin Fulan. Terbuka untuk umum Ikhwan & Akhwat. Disediakan sarapan bersama.";
-        s3.tanggalAgenda = "Ahad, Pukul 06.00 - 07.30 WIB";
-        s3.narasumber = "Dewan Kemakmuran Masjid (DKM)";
+        s3.agendaList.add(new SlideModel.AgendaItem("Kajian Akbar Akhir Pekan: Membedah Kitab Riyadhus Shalihin", "Ahad, 06.00 - 07.30 WIB", "Ust. Dr. H. Ahmad Fauzi", "Kajian terbuka untuk umum Ikhwan & Akhwat. Disediakan sarapan bersama."));
+        s3.agendaList.add(new SlideModel.AgendaItem("Kajian Fiqih Ibadah", "Senin Ba'da Maghrib", "Ust. Abdullah", "Pembahasan tata cara sholat khusyuk sesuai sunnah."));
+        s3.agendaList.add(new SlideModel.AgendaItem("Tahsin & Tahfidz Al-Qur'an", "Rabu, 18.30 WIB", "Ustadz Hamzah", "Bimbingan makharijul huruf & hafalan juz 30."));
+        s3.agendaList.add(new SlideModel.AgendaItem("Kajian Khusus Muslimah / Akhwat", "Kamis, 09.00 - 11.00 WIB", "Ustadzah Fatimah, Lc", "Fiqih keluarga sakinah dan peran ibu dalam Islam."));
+        s3.agendaList.add(new SlideModel.AgendaItem("Tabligh Akbar Menyambut Ramadhan", "Sabtu Malam Ahad", "Habib Muhammad Al-Haddad", "Persiapan ruhani & ilmu menyambut bulan suci Ramadhan."));
+        s3.agendaList.add(new SlideModel.AgendaItem("Pemeriksaan Kesehatan Gratis", "Ahad Pekan Depan 07.30 WIB", "Tim Medis Rumah Sakit Islam", "Pengecekan tensi, gula darah, dan konsultasi dokter gratis."));
+        s3.agendaList.add(new SlideModel.AgendaItem("Gerakan Bersih Masjid", "Jumat Pagi, 06.30 WIB", "Remaja Islam Masjid (RISMA)", "Kerja bakti bersama membersihkan karpet dan pelataran."));
+
+        // Slide 4: Template Live Streaming Kajian / Khotbah (DEFAULT NON-AKTIF, SIAP DIAKTIFKAN)
+        SlideModel s4 = new SlideModel("slide_live_khotbah", SlideModel.TYPE_LIVE_STREAM, "Live Siaran Khotbah & Kajian", false, 60);
+        s4.liveRtspUrl = "rtsp://admin:LNUMXL@192.168.1.114:554/ch1/main";
+        s4.isLocked = true; // Mode kunci saat live aktif
+        s4.audioEnabled = false;
+
+        // Slide 5: Template Multi-Stream CCTV (DEFAULT NON-AKTIF)
+        SlideModel s5 = new SlideModel("slide_cctv_multi", SlideModel.TYPE_CCTV, "CCTV Pengawasan Masjid", false, 30);
+        s5.cctvStreams.add(new SlideModel.CctvStream("Kamera Utama / Shaf Depan", "rtsp://admin:LNUMXL@192.168.1.114:554/ch1/main"));
+        s5.cctvStreams.add(new SlideModel.CctvStream("Kamera Tempat Wudhu & Parkir", "rtsp://admin:LNUMXL@192.168.1.114:554/ch1/main"));
 
         slides.add(s1);
         slides.add(s2);
         slides.add(s3);
+        slides.add(s4);
+        slides.add(s5);
     }
 
     public synchronized void persist() {

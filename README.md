@@ -9,10 +9,18 @@ Bebas iklan, ringan, 100% ramah navigasi remote D-pad, dengan kontrol panel **We
 
 - **Layar Penuh Multi-Slide Kiosk Display**:
   - **Slide 1: Jadwal Sholat & Al-Qur'an (Inti)**: Jam digital format besar (`HH:mm:ss`), tanggal Masehi & Hijriah, 5 waktu sholat (+ Imsak & Dhuha), countdown dinamis, dan rotasi 6.236 ayat Al-Qur'an terkompresi offline.
-  - **Slide 2: Laporan Keuangan & Kas Masjid**: Menampilkan saldo awal, penerimaan infaq, pengeluaran, saldo akhir, dan catatan rincian kas.
-  - **Slide 3: Agenda Kajian & Pengumuman**: Tanggal, narasumber, dan uraian pengumuman kegiatan masjid.
-  - **Slide Custom Poster / Flyer**: Upload gambar flyer kegiatan langsung dari HP via Web Admin.
-  - *Default: Hanya Slide 1 yang aktif. Template Kas dan Pengumuman siap diaktifkan dan dikustomisasi kapan saja via Web Admin.*
+  - **Slide 2: Smart Agenda & Pengumuman (Auto Split 2 Slide)**:
+    - *Slide 2A (Agenda Terdekat / Hero)*: Menampilkan 1 agenda utama terdekat secara detail (judul besar, jam, narasumber, deskripsi).
+    - *Slide 2B (Daftar 6 Agenda Mendatang)*: Menampilkan daftar 6 agenda berikutnya dalam format grid responsif 2 baris x 3 kolom yang mudah dibaca.
+  - **Slide 3: Multi-Stream CCTV Pengawasan (RTSP Grid Dinamis)**:
+    - Menampilkan 1 hingga 6 kamera pengawasan CCTV secara dinamis (1 kamera full, 2 kamera split 1x2, 3-4 kamera grid 2x2, 5-6 kamera grid 2x3).
+    - Masing-masing kotak kamera dilengkapi label lokasi overlay.
+  - **Slide 4: Live Streaming Khotbah / Kajian (RTSP Single + Lock Mode)**:
+    - Menampilkan siaran langsung kamera penceramah/khotbah secara layar penuh.
+    - **Lock Mode**: Menahan/mengunci perputaran slide otomatis selama kajian berlangsung.
+    - **Remote Exit**: Pengguna cukup menekan tombol **`Back (Kembali)`** pada remote TV untuk menutup siaran live dan kembali ke putaran slide normal.
+  - **Slide 5: Laporan Keuangan & Kas Masjid**: Menampilkan saldo awal, penerimaan infaq, pengeluaran, saldo akhir, dan catatan kas.
+  - **Slide 6: Poster / Flyer Kajian**: Upload gambar flyer kegiatan langsung dari HP via Web Admin.
 - **Interupsi Cerdas Waktu Sholat**:
   - Saat waktu sholat mendekat (< 5 menit) atau saat adzan, perputaran slider **otomatis dihentikan sementara dan layar terkunci di Slide Jadwal Sholat** agar jamaah fokus melihat waktu sholat. Slider kembali berputar setelahnya.
 - **Embedded Web Server Administrator (Port 8080)**:
