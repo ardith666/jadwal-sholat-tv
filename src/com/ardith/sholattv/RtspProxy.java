@@ -15,7 +15,7 @@ import java.util.regex.Pattern;
 
 /**
  * Lightweight local RTSP proxy to sanitize and fix non-standard H.265 SDP headers
- * emitted by IP cameras (e.g. missing 'sprop-vps' parameter required by Android ExoPlayer).
+ * emitted by IP cameras and adjust URLs.
  */
 public final class RtspProxy {
     private static final String TAG = "RtspProxy";
@@ -25,10 +25,11 @@ public final class RtspProxy {
     private static Thread sServerThread;
     private static volatile boolean sIsRunning = false;
 
-    // Camera exact parameter sets (captured from camera RTP payload stream)
-    private static final String EXACT_VPS = "QAEMAf//AWAAAAMAAAMAAAMAAAMAlrwJ";
-    private static final String EXACT_SPS = "QgEBAWAAAAMAAAMAAAMAAAMAlqABaCAGWfeNvkkyIuWewCAAAH0gAAdU4QE=";
-    private static final String EXACT_PPS = "RAHgdrAmQA==";
+    // Exact NAL parameter sets for 192.168.1.114
+    private static final String DEFAULT_VPS = "QAEMAf//AWAAAAMAAAMAAAMAAAMAlrwJ";
+    private static final String DEFAULT_SPS_MAIN = "QgEBAWAAAAMAAAMAAAMAAAMAlqABaCAGWfeNvkkyIuWewCAAAH0gAAdU4QE=";
+    private static final String DEFAULT_SPS_SUB = "QgEBAWAAAAMAAAMAAAMAAAMAWqAGAgGxY2uSTJrljAIAAAfSAABONBBBqAM=";
+    private static final String DEFAULT_PPS = "RAHgdrAmQA==";
 
     public static synchronized void start() {
         if (sIsRunning) return;
@@ -65,22 +66,27 @@ public final class RtspProxy {
         Log.i(TAG, "RTSP Proxy stopped");
     }
 
-    /**
-     * Converts a target RTSP url to point through this local proxy.
-     */
     public static String getProxyUrl(String originalRtspUrl) {
         if (originalRtspUrl == null || !originalRtspUrl.startsWith("rtsp://")) {
             return originalRtspUrl;
         }
+
+        // Jika kamera 192.168.1.114 meminta /ch1/main (resolusi 2880x1620 yang melampaui limit decoder 1920x1088 TV),
+        // otomatis switch ke /ch1/sub (substream 720p/D1) agar decoder hardware TV lancar memutar video!
+        String effectiveUrl = originalRtspUrl;
+        if (effectiveUrl.contains("192.168.1.114") && effectiveUrl.contains("/ch1/main")) {
+            Log.i(TAG, "Auto-switching 192.168.1.114 from 3K main-stream to 720p sub-stream for TV decoder compatibility");
+            effectiveUrl = effectiveUrl.replace("/ch1/main", "/ch1/sub");
+        }
+
         try {
-            URI u = new URI(originalRtspUrl);
+            URI u = new URI(effectiveUrl);
             String host = u.getHost();
             int port = u.getPort() > 0 ? u.getPort() : 554;
             String path = u.getRawPath();
             if (path == null) path = "";
             String query = u.getRawQuery();
 
-            // Encode target host and port in query so proxy knows where to connect
             StringBuilder sb = new StringBuilder();
             sb.append("rtsp://127.0.0.1:").append(PROXY_PORT).append(path);
             sb.append("?_dst_host=").append(host).append("&_dst_port=").append(port);
@@ -105,7 +111,6 @@ public final class RtspProxy {
             InputStream inClient = client.getInputStream();
             OutputStream outClient = client.getOutputStream();
 
-            // Read first request line
             byte[] buf = new byte[8192];
             int n = inClient.read(buf);
             if (n <= 0) {
@@ -141,7 +146,6 @@ public final class RtspProxy {
             InputStream inTarget = target.getInputStream();
             OutputStream outTarget = target.getOutputStream();
 
-            // Forward first request, stripping internal query parameters
             String sanitizedReq = sanitizeClientRequest(firstReq, dstHost, dstPort, authParam);
             outTarget.write(sanitizedReq.getBytes(StandardCharsets.UTF_8));
             outTarget.flush();
@@ -151,7 +155,6 @@ public final class RtspProxy {
             int fDstPort = dstPort;
             String fAuth = authParam;
 
-            // Pipe client -> target
             Thread tUp = new Thread(() -> {
                 try {
                     byte[] upBuf = new byte[8192];
@@ -166,13 +169,11 @@ public final class RtspProxy {
                 closeQuietly(client, fTarget);
             });
 
-            // Pipe target -> client with SDP H.265 rewriting
             Thread tDown = new Thread(() -> {
                 try {
                     byte[] downBuf = new byte[16384];
                     int r;
                     while ((r = inTarget.read(downBuf)) > 0) {
-                        // Check if response contains SDP with H265
                         byte[] processed = fixSdpResponse(downBuf, r);
                         outClient.write(processed);
                         outClient.flush();
@@ -191,7 +192,6 @@ public final class RtspProxy {
     }
 
     private static String sanitizeClientRequest(String req, String dstHost, int dstPort, String authParam) {
-        // Replace 127.0.0.1:8554 with actual camera host:port
         String s = req.replace("127.0.0.1:" + PROXY_PORT, dstHost + ":" + dstPort);
         s = s.replaceAll("\\?_dst_host=[^\\s&]+", "");
         s = s.replaceAll("&_dst_host=[^\\s&]+", "");
@@ -200,7 +200,6 @@ public final class RtspProxy {
         s = s.replaceAll("\\?_auth=[^\\s&]+", "");
         s = s.replaceAll("&_auth=[^\\s&]+", "");
 
-        // Inject Authorization header if missing and credentials provided
         if (authParam != null && !s.contains("Authorization:")) {
             s = s.replaceFirst("\r\n", "\r\nAuthorization: Basic " + authParam + "\r\n");
         }
@@ -210,13 +209,16 @@ public final class RtspProxy {
     private static byte[] fixSdpResponse(byte[] data, int length) {
         String s = new String(data, 0, length, StandardCharsets.ISO_8859_1);
         if (s.contains("m=video") && s.contains("H265")) {
-            // Check if sprop-vps is missing and sprop-parameter-sets is present
+            // Jika ada parameter H265 tapi missing sprop-vps atau parameter sets tidak lengkap
             if (s.contains("sprop-parameter-sets=") || !s.contains("sprop-vps")) {
                 Pattern pat = Pattern.compile("a=fmtp:(\\d+)[^\\r\\n]+");
                 Matcher m = pat.matcher(s);
                 if (m.find()) {
                     String pt = m.group(1);
-                    String newFmtp = "a=fmtp:" + pt + " profile-level-id=420029; packetization-mode=1; sprop-vps=" + EXACT_VPS + "; sprop-sps=" + EXACT_SPS + "; sprop-pps=" + EXACT_PPS;
+                    boolean isSub = s.contains("/ch1/sub") || s.contains("subtype=1");
+                    String spsToUse = isSub ? DEFAULT_SPS_SUB : DEFAULT_SPS_MAIN;
+
+                    String newFmtp = "a=fmtp:" + pt + " profile-level-id=420029; packetization-mode=1; sprop-vps=" + DEFAULT_VPS + "; sprop-sps=" + spsToUse + "; sprop-pps=" + DEFAULT_PPS;
                     s = s.replace(m.group(0), newFmtp);
 
                     Pattern lenPat = Pattern.compile("Content-Length:\\s*(\\d+)", Pattern.CASE_INSENSITIVE);
@@ -234,7 +236,6 @@ public final class RtspProxy {
                 }
             }
         }
-        // Return raw unchanged data
         byte[] raw = new byte[length];
         System.arraycopy(data, 0, raw, 0, length);
         return raw;
