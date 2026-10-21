@@ -295,15 +295,28 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
         quranCardContainer.addView(quranContent, new FrameLayout.LayoutParams(-1, -2, Gravity.CENTER));
         content.addView(quranCardContainer, new LinearLayout.LayoutParams(-1, 0, 1f));
 
-        // 5. FOOTER ATTRIBUTION (Dibuat oleh : ardith666)
+        // 5. FOOTER (Kiri: Versi & Tanggal Rilis | Kanan: Dibuat oleh : ardith666)
+        LinearLayout footer = new LinearLayout(this);
+        footer.setOrientation(LinearLayout.HORIZONTAL);
+        footer.setGravity(Gravity.CENTER_VERTICAL);
+        footer.setPadding(0, dp(6), dp(4), 0);
+
+        TextView versionText = new TextView(this);
+        versionText.setText("v1.3 (Rilis: 21 Okt 2026)");
+        versionText.setTextColor(0x80FFFFFF);
+        versionText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
+        versionText.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
+        footer.addView(versionText, new LinearLayout.LayoutParams(0, -2, 1f));
+
         creditText = new TextView(this);
         creditText.setText("Dibuat oleh : ardith666");
         creditText.setTextColor(0x80FFFFFF);
         creditText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
         creditText.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
         creditText.setGravity(Gravity.END);
-        creditText.setPadding(0, dp(6), dp(4), 0);
-        content.addView(creditText, new LinearLayout.LayoutParams(-1, -2));
+        footer.addView(creditText, new LinearLayout.LayoutParams(-2, -2));
+
+        content.addView(footer, new LinearLayout.LayoutParams(-1, -2));
 
         rootLayout.addView(content);
         setContentView(rootLayout);
