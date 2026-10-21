@@ -42,3 +42,11 @@
   - Mengubah perilaku dialog Settings: Ketika mengubah lokasi, tema, suara, atau toggle ON/OFF, dialog tidak langsung keluar ke layar utama melainkan tetap bertahan di menu pengaturan dengan state ter-update
   - Tombol Batal pada sub-dialog otomatis kembali ke menu utama pengaturan
   - Status: ✅ Terverifikasi di TV TCL (Screenshot: backup/tcl-19-settings-keep-open.png) & dipush ke GitHub (Commit 3088143)
+
+- [2026-10-21 08:50] Rilis v1.3 - Header Contributor QRIS & Gallery Thumbnail (Terang / Gelap):
+  - Header Contributor QRIS: Di bagian paling atas menu pengaturan disematkan kartu pendukung developer dengan barcode QRIS (`assets/qris.png`), pesan ajakan support/doa, dan doa “Jazakumullahu khairan” (bisa diklik untuk memperbesar QRIS)
+  - Galeri Thumbnail Background: Background dikelompokkan ke dalam 2 menu visual terpisah:
+    1. 🌙 Koleksi Tema Gelap (15 pilihan: 10 foto malam + 5 motif gelap)
+    2. ☀️ Koleksi Tema Terang (15 pilihan: 10 foto siang + 5 motif terang)
+  - Layout GridView 3 kolom dengan pratinjau thumbnail 16:9 yang ringan, border fokus D-pad menyala, dan penanda tema aktif
+  - Status: ✅ Teruji di TV TCL (Screenshots: backup/tcl-20, tcl-21, tcl-22) & dipush ke GitHub (Commit 758dafd)

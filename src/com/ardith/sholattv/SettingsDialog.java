@@ -126,10 +126,7 @@ public final class SettingsDialog {
         ImageView qrisView = new ImageView(context);
         qrisView.setLayoutParams(new LinearLayout.LayoutParams(dp(context, 110), dp(context, 110)));
         qrisView.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        try (InputStream in = context.getAssets().open("qris.png")) {
-            Bitmap bmp = BitmapFactory.decodeStream(in);
-            if (bmp != null) qrisView.setImageBitmap(bmp);
-        } catch (Exception ignored) {}
+        qrisView.setImageResource(R.drawable.qris);
 
         // Container putih untuk QRIS agar tajam dipindai kamera
         FrameLayout qrisFrame = new FrameLayout(context);
@@ -299,10 +296,7 @@ public final class SettingsDialog {
         ImageView iv = new ImageView(context);
         iv.setLayoutParams(new LinearLayout.LayoutParams(dp(context, 280), dp(context, 380)));
         iv.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        try (InputStream in = context.getAssets().open("qris.png")) {
-            Bitmap bmp = BitmapFactory.decodeStream(in);
-            if (bmp != null) iv.setImageBitmap(bmp);
-        } catch (Exception ignored) {}
+        iv.setImageResource(R.drawable.qris);
 
         FrameLayout whiteBox = new FrameLayout(context);
         whiteBox.setBackgroundColor(0xFFFFFFFF);
