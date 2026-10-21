@@ -327,108 +327,106 @@ public final class SettingsDialog {
         final String[][] themeSet = isLight ? LIGHT_THEMES : DARK_THEMES;
         String title = isLight ? "☀️ Koleksi Tema Terang (15 Pilihan)" : "🌙 Koleksi Tema Gelap (15 Pilihan)";
 
+        ScrollView scroll = new ScrollView(context);
+        scroll.setLayoutParams(new ViewGroup.LayoutParams(-1, -1));
+
         LinearLayout layout = new LinearLayout(context);
         layout.setOrientation(LinearLayout.VERTICAL);
-        layout.setPadding(dp(context, 20), dp(context, 14), dp(context, 20), dp(context, 10));
-
-        GridView grid = new GridView(context);
-        grid.setNumColumns(3);
-        grid.setVerticalSpacing(dp(context, 14));
-        grid.setHorizontalSpacing(dp(context, 14));
-        grid.setGravity(Gravity.CENTER);
-        grid.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(context, 420)));
+        layout.setPadding(dp(context, 20), dp(context, 14), dp(context, 20), dp(context, 20));
 
         final String activeTheme = alertManager.getTheme();
-
         AlertDialog[] dialogHolder = new AlertDialog[1];
+        Map<String, Bitmap> thumbCache = new HashMap<>();
 
-        grid.setAdapter(new BaseAdapter() {
-            private final Map<String, Bitmap> thumbCache = new HashMap<>();
+        // Buat baris kartu secara modular (3 item per baris) agar bebas scroll dan 100% responsif D-pad remote
+        int total = themeSet.length;
+        for (int i = 0; i < total; i += 3) {
+            LinearLayout row = new LinearLayout(context);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.CENTER);
 
-            @Override public int getCount() { return themeSet.length; }
-            @Override public Object getItem(int position) { return themeSet[position]; }
-            @Override public long getItemId(int position) { return position; }
+            for (int j = 0; j < 3; j++) {
+                int index = i + j;
+                if (index < total) {
+                    final String file = themeSet[index][0];
+                    final String name = themeSet[index][1];
+                    final boolean isSelected = file.equals(activeTheme);
 
-            @Override
-            public View getView(int position, View convertView, ViewGroup parent) {
-                LinearLayout card;
-                ImageView thumbView;
-                TextView labelView;
-
-                if (convertView == null) {
-                    card = new LinearLayout(context);
+                    LinearLayout card = new LinearLayout(context);
                     card.setOrientation(LinearLayout.VERTICAL);
                     card.setGravity(Gravity.CENTER_HORIZONTAL);
                     card.setPadding(dp(context, 6), dp(context, 6), dp(context, 6), dp(context, 8));
                     card.setFocusable(true);
 
-                    thumbView = new ImageView(context);
-                    thumbView.setLayoutParams(new LinearLayout.LayoutParams(dp(context, 180), dp(context, 102))); // 16:9 aspect
+                    GradientDrawable cardBg = new GradientDrawable();
+                    cardBg.setCornerRadius(dp(context, 10));
+                    cardBg.setColor(isSelected ? 0x4D2EA043 : 0x33161B22);
+                    cardBg.setStroke(dp(context, isSelected ? 2 : 1), isSelected ? 0xFFFFD700 : 0x33FFFFFF);
+                    card.setBackground(cardBg);
+
+                    ImageView thumbView = new ImageView(context);
+                    thumbView.setLayoutParams(new LinearLayout.LayoutParams(dp(context, 180), dp(context, 102))); // 16:9
                     thumbView.setScaleType(ImageView.ScaleType.CENTER_CROP);
                     card.addView(thumbView);
 
-                    labelView = new TextView(context);
-                    labelView.setTextColor(0xFFFFFFFF);
+                    TextView labelView = new TextView(context);
+                    labelView.setText(name + (isSelected ? "\n✓ AKTIF" : ""));
+                    labelView.setTextColor(isSelected ? 0xFFFFD700 : 0xFFFFFFFF);
                     labelView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
-                    labelView.setSingleLine(true);
                     labelView.setGravity(Gravity.CENTER);
-                    labelView.setPadding(0, dp(context, 6), 0, 0);
+                    labelView.setPadding(0, dp(context, 4), 0, 0);
                     card.addView(labelView);
+
+                    // Load sample thumbnail
+                    Bitmap thumb = thumbCache.get(file);
+                    if (thumb == null) {
+                        try (InputStream in = context.getAssets().open("backgrounds/" + file)) {
+                            BitmapFactory.Options opts = new BitmapFactory.Options();
+                            opts.inSampleSize = 8;
+                            thumb = BitmapFactory.decodeStream(in, null, opts);
+                            if (thumb != null) thumbCache.put(file, thumb);
+                        } catch (Exception ignored) {}
+                    }
+                    if (thumb != null) {
+                        thumbView.setImageBitmap(thumb);
+                    }
+
+                    card.setOnFocusChangeListener((v, has) -> {
+                        cardBg.setColor(has ? 0x662EA043 : (file.equals(alertManager.getTheme()) ? 0x4D2EA043 : 0x33161B22));
+                        cardBg.setStroke(dp(context, 2), has ? 0xFFFFFFFF : (file.equals(alertManager.getTheme()) ? 0xFFFFD700 : 0x33FFFFFF));
+                        v.animate().scaleX(has ? 1.06f : 1f).scaleY(has ? 1.06f : 1f).setDuration(160).start();
+                    });
+
+                    // KLIK LANGSUNG MENERAPKAN TEMA
+                    card.setOnClickListener(v -> {
+                        alertManager.setTheme(file);
+                        if (dialogHolder[0] != null) dialogHolder[0].dismiss();
+                        if (listener != null) listener.onThemeChanged();
+                        show(context, prayerEngine, alertManager, listener);
+                    });
+
+                    LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(dp(context, 192), -2);
+                    cardLp.setMargins(dp(context, 6), 0, dp(context, 6), 0);
+                    row.addView(card, cardLp);
                 } else {
-                    card = (LinearLayout) convertView;
-                    thumbView = (ImageView) card.getChildAt(0);
-                    labelView = (TextView) card.getChildAt(1);
+                    // Spacer agar rata
+                    View spacer = new View(context);
+                    LinearLayout.LayoutParams spacerLp = new LinearLayout.LayoutParams(dp(context, 192), -2);
+                    spacerLp.setMargins(dp(context, 6), 0, dp(context, 6), 0);
+                    row.addView(spacer, spacerLp);
                 }
-
-                String file = themeSet[position][0];
-                String name = themeSet[position][1];
-                boolean isSelected = file.equals(activeTheme);
-
-                labelView.setText(name + (isSelected ? " (Aktif)" : ""));
-                labelView.setTextColor(isSelected ? 0xFFFFD700 : 0xFFFFFFFF);
-
-                GradientDrawable cardBg = new GradientDrawable();
-                cardBg.setCornerRadius(dp(context, 10));
-                cardBg.setColor(isSelected ? 0x4D2EA043 : 0x33161B22);
-                cardBg.setStroke(dp(context, isSelected ? 2 : 1), isSelected ? 0xFFFFD700 : 0x33FFFFFF);
-                card.setBackground(cardBg);
-
-                card.setOnFocusChangeListener((v, has) -> {
-                    cardBg.setColor(has ? 0x662EA043 : (file.equals(alertManager.getTheme()) ? 0x4D2EA043 : 0x33161B22));
-                    cardBg.setStroke(dp(context, 2), has ? 0xFFFFFFFF : (file.equals(alertManager.getTheme()) ? 0xFFFFD700 : 0x33FFFFFF));
-                    v.animate().scaleX(has ? 1.08f : 1f).scaleY(has ? 1.08f : 1f).setDuration(160).start();
-                });
-
-                // Load cached / sampled thumbnail
-                Bitmap thumb = thumbCache.get(file);
-                if (thumb == null) {
-                    try (InputStream in = context.getAssets().open("backgrounds/" + file)) {
-                        BitmapFactory.Options opts = new BitmapFactory.Options();
-                        opts.inSampleSize = 8; // Super fast & small memory footprint
-                        thumb = BitmapFactory.decodeStream(in, null, opts);
-                        if (thumb != null) thumbCache.put(file, thumb);
-                    } catch (Exception ignored) {}
-                }
-                if (thumb != null) {
-                    thumbView.setImageBitmap(thumb);
-                }
-
-                return card;
             }
-        });
 
-        grid.setOnItemClickListener((parent, view, position, id) -> {
-            alertManager.setTheme(themeSet[position][0]);
-            dialogHolder[0].dismiss();
-            if (listener != null) listener.onThemeChanged();
-            show(context, prayerEngine, alertManager, listener);
-        });
+            LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(-1, -2);
+            rowLp.setMargins(0, 0, 0, dp(context, 12));
+            layout.addView(row, rowLp);
+        }
 
-        layout.addView(grid);
+        scroll.addView(layout);
 
         AlertDialog dialog = new AlertDialog.Builder(context, android.R.style.Theme_DeviceDefault_Dialog_Alert)
                 .setTitle(title)
-                .setView(layout)
+                .setView(scroll)
                 .setNegativeButton("Kembali", (d, which) -> show(context, prayerEngine, alertManager, listener))
                 .setOnCancelListener(d -> show(context, prayerEngine, alertManager, listener))
                 .create();
