@@ -2,9 +2,11 @@ package com.ardith.sholattv;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
+import android.os.Build;
 import android.util.Log;
 import android.widget.Toast;
 
@@ -12,6 +14,9 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -20,7 +25,7 @@ import java.nio.charset.StandardCharsets;
 public final class UpdateChecker {
     private static final String TAG = "UpdateChecker";
     private static final String GITHUB_REPO = "ardith666/jadwal-sholat-tv";
-    private static final String CURRENT_VERSION = "1.3";
+    private static final String CURRENT_VERSION = "1.4";
 
     public interface UpdateCheckCallback {
         void onCheckFinished(boolean updateAvailable, String latestTag, String downloadUrl, String releaseNotes);
@@ -87,22 +92,102 @@ public final class UpdateChecker {
     public static void showUpdateDialog(Context context, String latestTag, String downloadUrl, String notes) {
         String msg = "Versi Baru Tersedia: v" + latestTag + " (Versi saat ini: v" + CURRENT_VERSION + ")\n\n"
                 + (notes != null && !notes.isEmpty() ? "Catatan Rilis:\n" + notes + "\n\n" : "")
-                + "Apakah Anda ingin membuka link download rilis terbaru?";
+                + "Apakah Anda ingin langsung mengunduh dan memperbarui aplikasi?";
 
         new AlertDialog.Builder(context, android.R.style.Theme_DeviceDefault_Dialog_Alert)
                 .setTitle("🚀 Pembaruan Aplikasi Tersedia")
                 .setMessage(msg)
-                .setPositiveButton("Buka Unduhan", (dialog, which) -> {
-                    try {
-                        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(downloadUrl));
-                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                        context.startActivity(intent);
-                    } catch (Exception e) {
-                        Toast.makeText(context, "Tidak ada browser untuk membuka link unduhan", Toast.LENGTH_SHORT).show();
-                    }
+                .setPositiveButton("Perbarui Sekarang", (dialog, which) -> {
+                    startDirectDownloadAndInstall(context, downloadUrl, latestTag);
                 })
                 .setNegativeButton("Nanti Saja", null)
                 .show();
+    }
+
+    private static void startDirectDownloadAndInstall(Context context, String downloadUrl, String versionTag) {
+        ProgressDialog progress = new ProgressDialog(context, android.R.style.Theme_DeviceDefault_Dialog_Alert);
+        progress.setTitle("Mengunduh Pembaruan");
+        progress.setMessage("Sedang mengunduh APK v" + versionTag + " langsung dari GitHub...");
+        progress.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
+        progress.setMax(100);
+        progress.setCancelable(false);
+        progress.show();
+
+        new Thread(() -> {
+            File apkFile = new File(context.getExternalCacheDir(), "jadwal-sholat-update.apk");
+            if (apkFile.exists()) apkFile.delete();
+
+            boolean success = false;
+            try {
+                URL url = new URL(downloadUrl);
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestProperty("User-Agent", "JadwalSholatTV-Updater");
+                conn.setInstanceFollowRedirects(true);
+                conn.setConnectTimeout(15000);
+                conn.setReadTimeout(30000);
+
+                // Handle HTTP redirect (GitHub release assets redirect to S3/Azure)
+                int status = conn.getResponseCode();
+                if (status == HttpURLConnection.HTTP_MOVED_TEMP || status == HttpURLConnection.HTTP_MOVED_PERM || status == 307 || status == 308) {
+                    String newUrl = conn.getHeaderField("Location");
+                    conn.disconnect();
+                    url = new URL(newUrl);
+                    conn = (HttpURLConnection) url.openConnection();
+                    conn.setRequestProperty("User-Agent", "JadwalSholatTV-Updater");
+                }
+
+                int totalLength = conn.getContentLength();
+                try (InputStream in = conn.getInputStream();
+                     FileOutputStream out = new FileOutputStream(apkFile)) {
+                    byte[] buffer = new byte[8192];
+                    int len;
+                    long downloaded = 0;
+                    while ((len = in.read(buffer)) != -1) {
+                        out.write(buffer, 0, len);
+                        downloaded += len;
+                        if (totalLength > 0) {
+                            int pct = (int) ((downloaded * 100) / totalLength);
+                            ((Activity) context).runOnUiThread(() -> progress.setProgress(pct));
+                        }
+                    }
+                    out.flush();
+                    success = true;
+                }
+                conn.disconnect();
+            } catch (Exception e) {
+                Log.e(TAG, "Download APK failed", e);
+            }
+
+            final boolean downloadedOk = success && apkFile.exists() && apkFile.length() > 50000;
+            ((Activity) context).runOnUiThread(() -> {
+                progress.dismiss();
+                if (downloadedOk) {
+                    installApk(context, apkFile);
+                } else {
+                    Toast.makeText(context, "Gagal mengunduh file update. Coba lagi nanti.", Toast.LENGTH_LONG).show();
+                }
+            });
+        }).start();
+    }
+
+    private static void installApk(Context context, File apkFile) {
+        try {
+            Intent intent = new Intent(Intent.ACTION_VIEW);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+
+            Uri uri = AppFileProvider.getUriForFile(
+                    context,
+                    context.getPackageName() + ".fileprovider",
+                    apkFile
+            );
+
+            intent.setDataAndType(uri, "application/vnd.android.package-archive");
+            context.startActivity(intent);
+        } catch (Exception e) {
+            Log.e(TAG, "Failed launching package installer", e);
+            Toast.makeText(context, "Gagal membuka installer APK: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
     }
 
     private static int compareVersions(String v1, String v2) {
