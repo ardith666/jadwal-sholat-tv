@@ -22,14 +22,19 @@ rm -rf "$B" && mkdir -p "$B/gen" "$B/classes" "$B/dex"
   -A assets --min-sdk-version 24 --target-sdk-version 34 "$B/res.zip"
 
 echo "Compiling Java sources..."
-javac -nowarn -Xlint:-options --release 11 -classpath "$JAR" -d "$B/classes" \
+CP="$JAR"
+for jar in libs/*.jar; do
+  [ -f "$jar" ] && CP="$CP:$jar"
+done
+javac -nowarn -Xlint:-options --release 11 -classpath "$CP" -d "$B/classes" \
   $(find src "$B/gen" -name '*.java')
 
 echo "Converting bytecode to DEX..."
-"$BT/d8" --min-api 24 --lib "$JAR" --output "$B/dex" $(find "$B/classes" -name '*.class')
+LIB_JARS=$(ls libs/*.jar 2>/dev/null || true)
+"$BT/d8" --min-api 24 --lib "$JAR" --output "$B/dex" $(find "$B/classes" -name '*.class') $LIB_JARS
 
 cp "$B/base.apk" "$B/unsigned.apk"
-(cd "$B/dex" && zip -q -u ../unsigned.apk classes.dex)
+(cd "$B/dex" && zip -q -u ../unsigned.apk classes*.dex)
 
 echo "Aligning & signing APK..."
 "$BT/zipalign" -f 4 "$B/unsigned.apk" "$B/aligned.apk"

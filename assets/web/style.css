@@ -24,6 +24,8 @@ body {
   background-color: var(--bg-dark);
   color: var(--text-main);
   min-height: 100vh;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 /* MODAL OVERLAY */
@@ -35,7 +37,8 @@ body {
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  padding: 16px;
+  padding: 20px;
+  overflow-y: auto;
 }
 
 .modal-card {
@@ -45,12 +48,16 @@ body {
   padding: 28px;
   max-width: 420px;
   width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
   box-shadow: 0 12px 36px rgba(0,0,0,0.6);
   text-align: center;
 }
 
 .modal-card.modal-lg {
-  max-width: 680px;
+  max-width: 720px;
+  max-height: 88vh;
+  overflow-y: auto;
   text-align: left;
 }
 

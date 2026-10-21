@@ -25,6 +25,8 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.media3.exoplayer.ExoPlayer;
+
 import java.io.InputStream;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -53,8 +55,8 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
     private List<SlideModel> activeSlides = new ArrayList<>();
     private boolean isAdzanApproaching = false;
 
-    // Active RTSP VideoViews to stop/release when changing slides
-    private final List<android.widget.VideoView> activeVideoViews = new ArrayList<>();
+    // Active ExoPlayers to release when changing slides or pausing
+    private final List<ExoPlayer> activePlayers = new ArrayList<>();
 
     private TextView clockText;
     private TextView dateText;
@@ -106,6 +108,25 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
     };
 
     @Override
+    public void registerPlayer(ExoPlayer player) {
+        if (player != null && !activePlayers.contains(player)) {
+            activePlayers.add(player);
+        }
+    }
+
+    private void stopAllVideoStreams() {
+        for (ExoPlayer player : activePlayers) {
+            try {
+                if (player != null) {
+                    player.stop();
+                    player.release();
+                }
+            } catch (Exception ignored) {}
+        }
+        activePlayers.clear();
+    }
+
+    @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
@@ -126,7 +147,8 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
         applyKeepAwake();
         applyTheme();
 
-        // Jalankan Web Server lokal (port 8080)
+        RtspProxy.start();
+
         if (webServerManager != null) {
             webServerManager.start();
         }
@@ -140,7 +162,6 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
         scheduleNextSlide();
         updateFooterIpText();
 
-        // Cek update otomatis di background jika diaktifkan (default: ON)
         if (alertManager != null && alertManager.isAutoUpdateCheckEnabled()) {
             handler.postDelayed(() -> {
                 if (!isActivityActive) return;
@@ -154,30 +175,12 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
     }
 
     @Override
-    public void registerVideoView(android.widget.VideoView vv) {
-        if (vv != null && !activeVideoViews.contains(vv)) {
-            activeVideoViews.add(vv);
-        }
-    }
-
-    private void stopAllVideoStreams() {
-        for (android.widget.VideoView vv : activeVideoViews) {
-            try {
-                if (vv != null) {
-                    vv.stopPlayback();
-                }
-            } catch (Exception ignored) {}
-        }
-        activeVideoViews.clear();
-    }
-
-    @Override
     protected void onPause() {
         super.onPause();
         isActivityActive = false;
-        // ZERO BACKGROUND RESOURCE FOOTPRINT
         handler.removeCallbacksAndMessages(null);
         stopAllVideoStreams();
+        RtspProxy.stop();
         if (webServerManager != null) {
             webServerManager.stop();
         }
@@ -191,6 +194,8 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
         super.onStop();
         isActivityActive = false;
         handler.removeCallbacksAndMessages(null);
+        stopAllVideoStreams();
+        RtspProxy.stop();
         if (webServerManager != null) {
             webServerManager.stop();
         }
@@ -234,25 +239,22 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
         FrameLayout rootLayout = new FrameLayout(this);
         rootLayout.setLayoutParams(new ViewGroup.LayoutParams(-1, -1));
 
-        // Background Image View
         bgImageView = new ImageView(this);
         bgImageView.setLayoutParams(new FrameLayout.LayoutParams(-1, -1));
         bgImageView.setScaleType(ImageView.ScaleType.CENTER_CROP);
         rootLayout.addView(bgImageView);
 
-        // Scrim Overlay
         scrimOverlay = new View(this);
         scrimOverlay.setLayoutParams(new FrameLayout.LayoutParams(-1, -1));
         scrimOverlay.setBackgroundColor(0x99000000);
         rootLayout.addView(scrimOverlay);
 
-        // Main Foreground Content
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
         content.setPadding(dp(36), dp(20), dp(36), dp(16));
         content.setLayoutParams(new FrameLayout.LayoutParams(-1, -1));
 
-        // 1. HEADER (Jam, Tanggal, Lokasi, Tombol Settings)
+        // 1. HEADER
         LinearLayout header = new LinearLayout(this);
         header.setOrientation(LinearLayout.HORIZONTAL);
         header.setGravity(Gravity.CENTER_VERTICAL);
@@ -286,14 +288,13 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
         settingsBtn.setOnClickListener(v -> SettingsDialog.show(this, prayerEngine, alertManager, slideManager, this));
         rightHeader.addView(settingsBtn, llp(-2, dp(38), 0, 0, 0, 0));
 
-        // Beri prioritas focusability pada tombol Settings & Location
         locationBadge.setNextFocusRightId(settingsBtn.getId());
         settingsBtn.setNextFocusLeftId(locationBadge.getId());
 
         header.addView(rightHeader, new LinearLayout.LayoutParams(-2, -2));
         content.addView(header, new LinearLayout.LayoutParams(-1, -2));
 
-        // 2. COUNTDOWN BANNER (Muncul jika < 5 menit sebelum masuk sholat)
+        // 2. COUNTDOWN BANNER
         countdownBanner = new TextView(this);
         countdownBanner.setTextColor(0xFFFFD700);
         countdownBanner.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
@@ -303,11 +304,10 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
         countdownBanner.setVisibility(View.GONE);
         content.addView(countdownBanner, new LinearLayout.LayoutParams(-1, -2));
 
-        // 3. SLIDER CONTAINER (Multi-Slide Layout)
+        // 3. SLIDER CONTAINER
         sliderContainer = new FrameLayout(this);
         sliderContainer.setLayoutParams(new LinearLayout.LayoutParams(-1, 0, 1f));
 
-        // Build Slide 1: Prayer Cards + Quran
         prayerSlideView = new LinearLayout(this);
         prayerSlideView.setOrientation(LinearLayout.VERTICAL);
         prayerSlideView.setLayoutParams(new FrameLayout.LayoutParams(-1, -1));
@@ -363,7 +363,7 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
         sliderContainer.addView(prayerSlideView);
         content.addView(sliderContainer);
 
-        // 4. FOOTER (Kiri: Versi & IP Web Admin | Kanan: Dibuat oleh : ardith666)
+        // 4. FOOTER
         LinearLayout footer = new LinearLayout(this);
         footer.setOrientation(LinearLayout.HORIZONTAL);
         footer.setGravity(Gravity.CENTER_VERTICAL);
@@ -433,12 +433,10 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
         handler.removeCallbacks(slideNextRunnable);
         if (activeSlides.size() <= 1) return;
 
-        // Jangan ganti slide jika adzan sedang mendekat (< 5 menit)
         if (isAdzanApproaching) return;
 
         SlideModel current = activeSlides.get(currentSlideIndex % activeSlides.size());
 
-        // Jika slide bertipe LIVE_STREAM dan di-lock, jangan otomatis pindah slide
         if (SlideModel.TYPE_LIVE_STREAM.equals(current.type) && current.isLocked) {
             Log.i(TAG, "Live Stream slide is locked, pausing automatic slide rotation");
             return;
@@ -491,7 +489,6 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
 
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
-        // Tombol BACK: Jika sedang di slide LIVE_STREAM (baik locked maupun tidak), keluar dari live stream
         if (keyCode == KeyEvent.KEYCODE_BACK) {
             if (!activeSlides.isEmpty()) {
                 SlideModel cur = activeSlides.get(currentSlideIndex % activeSlides.size());
@@ -502,14 +499,12 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
             }
         }
 
-        // Tombol D-pad ATAS: Langsung arahkan fokus ke tombol Pengaturan jika belum fokus
         if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
             if (settingsBtn != null && !settingsBtn.isFocused()) {
                 settingsBtn.requestFocus();
                 return true;
             }
         } else if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
-            // Tombol D-pad BAWAH: Lepaskan fokus dari header kembali ke konten slider
             if (settingsBtn != null && settingsBtn.isFocused()) {
                 if (quranCardContainer != null) {
                     quranCardContainer.requestFocus();
@@ -518,8 +513,6 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
             }
         }
 
-        // Navigasi manual slide remote D-pad Kiri / Kanan
-        // Hanya berganti slide jika fokus BUKAN di tombol Settings atau Location Badge
         boolean isHeaderFocused = (settingsBtn != null && settingsBtn.isFocused())
                 || (locationBadge != null && locationBadge.isFocused());
 
@@ -554,19 +547,16 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
         Toast.makeText(this, "Siaran Live ditutup. Kembali ke jadwal normal.", Toast.LENGTH_SHORT).show();
         stopAllVideoStreams();
 
-        // 1. Nonaktifkan lock pada live stream di memory & file json
         for (SlideModel s : slideManager.getAllSlides()) {
             if (SlideModel.TYPE_LIVE_STREAM.equals(s.type)) {
                 s.isLocked = false;
-                s.enabled = false; // Matikan live agar tidak kembali looping ke live
+                s.enabled = false;
             }
         }
         slideManager.persist();
 
-        // 2. Reload daftar slide aktif
         activeSlides = slideManager.getEnabledSlides();
 
-        // 3. Cari index slide Jadwal Sholat (PRAYER)
         int prayerIdx = 0;
         for (int i = 0; i < activeSlides.size(); i++) {
             if (SlideModel.TYPE_PRAYER.equals(activeSlides.get(i).type)) {
@@ -676,7 +666,7 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
             }
         }
         if (nextIdx == -1) {
-            nextIdx = 1; // Fallback to Subuh besok
+            nextIdx = 1;
         }
 
         if (nextIdx != highlightedSlotIndex) {
@@ -684,11 +674,9 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
             renderScheduleCards();
         }
 
-        // Check countdown (< 5 menit = 300 detik)
         PrayerEngine.Slot nextSlot = slots.get(highlightedSlotIndex);
         if (nextDiffSec > 0 && nextDiffSec <= 300 && alertManager.isCountdownEnabled()) {
             isAdzanApproaching = true;
-            // Lock screen pada Slide Jadwal Sholat
             if (customSlideView != null && prayerSlideView.getVisibility() != View.VISIBLE) {
                 showSlideAt(0);
             }
@@ -699,7 +687,6 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
             countdownBanner.setText(String.format(Locale.getDefault(),
                     "⏳ Menuju Waktu %s: -%02d:%02d", nextSlot.name, m, s));
 
-            // Suara hitung mundur: 30s, 20s, dan 10 s/d 0s
             if ((nextDiffSec == 30 || nextDiffSec == 20 || (nextDiffSec >= 0 && nextDiffSec <= 10))
                     && nextDiffSec != lastPlayedPipSecond) {
                 lastPlayedPipSecond = nextDiffSec;
@@ -713,7 +700,6 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
             }
         }
 
-        // Trigger alert adzan tepat pada waktu sholat (detik 0)
         if (nextDiffSec == 0 && nowMin != lastAlertTriggeredMinute) {
             lastAlertTriggeredMinute = nowMin;
             onPrayerTimeArrived(nextSlot.name);
@@ -769,9 +755,6 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
         quranCardContainer.startAnimation(fadeOut);
     }
 
-    // ==========================================
-    // LISTENER CALLBACKS
-    // ==========================================
     @Override
     public void onLocationChanged() {
         locationBadge.setText("📍 " + prayerEngine.getCityName());
@@ -839,6 +822,7 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
         super.onDestroy();
         isActivityActive = false;
         handler.removeCallbacksAndMessages(null);
+        stopAllVideoStreams();
         if (webServerManager != null) {
             webServerManager.stop();
         }

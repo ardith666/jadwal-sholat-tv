@@ -6,19 +6,22 @@ import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
-import android.media.MediaPlayer;
 import android.net.Uri;
+import android.util.Log;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
-import android.widget.GridLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
-import android.widget.VideoView;
+
+import androidx.media3.common.MediaItem;
+import androidx.media3.common.Player;
+import androidx.media3.exoplayer.ExoPlayer;
+import androidx.media3.exoplayer.rtsp.RtspMediaSource;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -28,9 +31,10 @@ import java.util.List;
 import java.util.Locale;
 
 public final class SlideViewBuilder {
+    private static final String TAG = "SlideViewBuilder";
 
     public interface StreamHolder {
-        void registerVideoView(VideoView vv);
+        void registerPlayer(ExoPlayer player);
     }
 
     public static View buildSlideView(Context ctx, SlideModel model, SlideManager sm, StreamHolder holder) {
@@ -219,7 +223,6 @@ public final class SlideViewBuilder {
             }
         }
 
-        // Layout 2 baris x 3 kolom
         LinearLayout gridLayout = new LinearLayout(ctx);
         gridLayout.setOrientation(LinearLayout.VERTICAL);
         gridLayout.setLayoutParams(new LinearLayout.LayoutParams(-1, 0, 1f));
@@ -298,54 +301,76 @@ public final class SlideViewBuilder {
     }
 
     // ==========================================
-    // 3. LIVE STREAMING KHOTBAH / KAJIAN (RTSP)
+    // 3. LIVE STREAMING KHOTBAH / KAJIAN (EXOPLAYER RTSP SURFACEVIEW)
     // ==========================================
     private static View buildLiveStreamView(Context ctx, SlideModel m, StreamHolder holder) {
         FrameLayout root = new FrameLayout(ctx);
         root.setLayoutParams(new ViewGroup.LayoutParams(-1, -1));
         root.setBackgroundColor(0xFF000000);
 
-        VideoView vv = new VideoView(ctx);
-        FrameLayout.LayoutParams vvLp = new FrameLayout.LayoutParams(-1, -1, Gravity.CENTER);
-        vv.setLayoutParams(vvLp);
+        android.view.SurfaceView surfaceView = new android.view.SurfaceView(ctx);
+        surfaceView.setLayoutParams(new FrameLayout.LayoutParams(-1, -1, Gravity.CENTER));
+        root.addView(surfaceView);
 
         if (m.liveRtspUrl != null && !m.liveRtspUrl.isEmpty()) {
-            vv.setVideoURI(Uri.parse(m.liveRtspUrl));
-            vv.setOnPreparedListener(mp -> {
-                if (!m.audioEnabled) {
-                    mp.setVolume(0f, 0f); // Mute jika audio dimatikan
-                }
-                vv.start();
-            });
-            vv.setOnErrorListener((mp, what, extra) -> {
-                Toast.makeText(ctx, "Gagal memutar RTSP Live Kajian", Toast.LENGTH_SHORT).show();
-                return true;
-            });
-            if (holder != null) holder.registerVideoView(vv);
-        }
-        root.addView(vv);
+            try {
+                ExoPlayer player = new ExoPlayer.Builder(ctx).build();
+                player.setVideoSurfaceView(surfaceView);
 
-        // Header Live Overlay Badge
+                String effectiveUrl = RtspProxy.getProxyUrl(m.liveRtspUrl);
+                Log.i(TAG, "Playing live stream via: " + effectiveUrl);
+
+                MediaItem mediaItem = new MediaItem.Builder()
+                        .setUri(Uri.parse(effectiveUrl))
+                        .build();
+                RtspMediaSource mediaSource = new RtspMediaSource.Factory()
+                        .setForceUseRtpTcp(true)
+                        .createMediaSource(mediaItem);
+
+                player.setMediaSource(mediaSource);
+                if (!m.audioEnabled) {
+                    player.setVolume(0f);
+                } else {
+                    player.setVolume(1.0f);
+                }
+                player.prepare();
+                player.play();
+
+                if (holder != null) holder.registerPlayer(player);
+            } catch (Exception e) {
+                Log.e(TAG, "Error starting ExoPlayer RTSP: " + e.getMessage());
+                Toast.makeText(ctx, "Gagal memutar RTSP Live Kajian", Toast.LENGTH_SHORT).show();
+            }
+        }
+
+        // Header Live Overlay Badge: [ ● LIVE ] dengan titik merah kedip
         LinearLayout badge = new LinearLayout(ctx);
         badge.setOrientation(LinearLayout.HORIZONTAL);
         badge.setGravity(Gravity.CENTER_VERTICAL);
-        badge.setPadding(dp(ctx, 16), dp(ctx, 8), dp(ctx, 16), dp(ctx, 8));
+        badge.setPadding(dp(ctx, 14), dp(ctx, 6), dp(ctx, 16), dp(ctx, 6));
 
         GradientDrawable badgeBg = new GradientDrawable();
-        badgeBg.setCornerRadius(dp(ctx, 16));
-        badgeBg.setColor(0xCCB00020);
+        badgeBg.setCornerRadius(dp(ctx, 14));
+        badgeBg.setColor(0xCC000000);
+        badgeBg.setStroke(dp(ctx, 1), 0x4DF85149);
         badge.setBackground(badgeBg);
 
-        TextView dot = new TextView(ctx);
-        dot.setText("● ");
-        dot.setTextColor(0xFFFFFFFF);
-        dot.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
-        badge.addView(dot);
+        TextView redDot = new TextView(ctx);
+        redDot.setText("● ");
+        redDot.setTextColor(0xFFE50914);
+        redDot.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+
+        android.view.animation.AlphaAnimation blink = new android.view.animation.AlphaAnimation(1.0f, 0.15f);
+        blink.setDuration(600);
+        blink.setRepeatMode(android.view.animation.Animation.REVERSE);
+        blink.setRepeatCount(android.view.animation.Animation.INFINITE);
+        redDot.startAnimation(blink);
+        badge.addView(redDot);
 
         TextView liveTxt = new TextView(ctx);
-        liveTxt.setText("LIVE SIARAN KHOTBAH / KAJIAN");
+        liveTxt.setText("LIVE");
         liveTxt.setTextColor(0xFFFFFFFF);
-        liveTxt.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        liveTxt.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
         liveTxt.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
         badge.addView(liveTxt);
 
@@ -373,7 +398,7 @@ public final class SlideViewBuilder {
     }
 
     // ==========================================
-    // 4. MULTI-STREAM CCTV (GRID DINAMIS 1 - 6)
+    // 4. MULTI-STREAM CCTV (EXOPLAYER RTSP GRID)
     // ==========================================
     private static View buildCctvGridView(Context ctx, SlideModel m, StreamHolder holder) {
         FrameLayout root = new FrameLayout(ctx);
@@ -393,7 +418,6 @@ public final class SlideViewBuilder {
             return root;
         }
 
-        // Tentukan grid layout berdasarkan jumlah kamera
         LinearLayout container = new LinearLayout(ctx);
         container.setLayoutParams(new FrameLayout.LayoutParams(-1, -1));
         container.setOrientation(LinearLayout.VERTICAL);
@@ -408,7 +432,6 @@ public final class SlideViewBuilder {
             row.addView(createCctvBox(ctx, list.get(1), holder), new LinearLayout.LayoutParams(0, -1, 1f));
             container.addView(row);
         } else {
-            // 3 s/d 6 kamera: 2 baris
             int perRow = (count <= 4) ? 2 : 3;
             for (int r = 0; r < 2; r++) {
                 LinearLayout row = new LinearLayout(ctx);
@@ -454,21 +477,33 @@ public final class SlideViewBuilder {
         FrameLayout box = new FrameLayout(ctx);
         box.setBackgroundColor(0xFF161B22);
 
-        VideoView vv = new VideoView(ctx);
-        vv.setLayoutParams(new FrameLayout.LayoutParams(-1, -1, Gravity.CENTER));
+        android.view.SurfaceView surfaceView = new android.view.SurfaceView(ctx);
+        surfaceView.setLayoutParams(new FrameLayout.LayoutParams(-1, -1, Gravity.CENTER));
+        box.addView(surfaceView);
 
         if (cam.rtspUrl != null && !cam.rtspUrl.isEmpty()) {
-            vv.setVideoURI(Uri.parse(cam.rtspUrl));
-            vv.setOnPreparedListener(mp -> {
-                mp.setVolume(0f, 0f); // Mute CCTV
-                vv.start();
-            });
-            vv.setOnErrorListener((mp, what, extra) -> true);
-            if (holder != null) holder.registerVideoView(vv);
-        }
-        box.addView(vv);
+            try {
+                ExoPlayer player = new ExoPlayer.Builder(ctx).build();
+                player.setVideoSurfaceView(surfaceView);
 
-        // Label Nama Kamera di pojok kiri bawah box
+                String effectiveUrl = RtspProxy.getProxyUrl(cam.rtspUrl);
+                MediaItem mediaItem = new MediaItem.Builder().setUri(Uri.parse(effectiveUrl)).build();
+                RtspMediaSource mediaSource = new RtspMediaSource.Factory()
+                        .setForceUseRtpTcp(true)
+                        .createMediaSource(mediaItem);
+
+                player.setMediaSource(mediaSource);
+                player.setVolume(0f); // Always mute CCTV
+                player.prepare();
+                player.play();
+
+                if (holder != null) holder.registerPlayer(player);
+            } catch (Exception e) {
+                Log.e(TAG, "Error playing CCTV stream: " + cam.rtspUrl, e);
+            }
+        }
+
+        // Label Nama Kamera
         TextView lbl = new TextView(ctx);
         lbl.setText("● " + cam.name);
         lbl.setTextColor(0xFFFFFFFF);
