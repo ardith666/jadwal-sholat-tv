@@ -13,6 +13,7 @@ public class SlideModel {
     public static final String TYPE_IMAGE = "IMAGE";
     public static final String TYPE_CCTV = "CCTV";
     public static final String TYPE_LIVE_STREAM = "LIVE_STREAM";
+    public static final String TYPE_YOUTUBE = "YOUTUBE";
 
     public static class AgendaItem {
         public String title;
@@ -95,11 +96,12 @@ public class SlideModel {
     // Data Gambar / Poster
     public String imageFileName;
 
-    // Data RTSP (Live Stream & Multi-CCTV)
+    // Data RTSP (Live Stream & Multi-CCTV) & YouTube
     public String liveRtspUrl;
-    public boolean isLocked; // Kunci layar TV saat live kajian berlangsung
+    public boolean isLocked; // Kunci layar TV saat live kajian / video youtube berlangsung
     public boolean audioEnabled;
     public List<CctvStream> cctvStreams = new ArrayList<>();
+    public String youtubeUrl; // Link video atau live stream YouTube
 
     public SlideModel(String id, String type, String title, boolean enabled, int durationSec) {
         this.id = id;
@@ -135,8 +137,9 @@ public class SlideModel {
             o.put("agendaList", aArr);
             o.put("agendaDisplayMode", agendaDisplayMode);
 
-            // RTSP & CCTV
+            // RTSP & CCTV & YouTube
             o.put("liveRtspUrl", liveRtspUrl != null ? liveRtspUrl : "");
+            o.put("youtubeUrl", youtubeUrl != null ? youtubeUrl : "");
             o.put("isLocked", isLocked);
             o.put("audioEnabled", audioEnabled);
 
@@ -187,8 +190,9 @@ public class SlideModel {
             }
         }
 
-        // RTSP
+        // RTSP & YouTube
         m.liveRtspUrl = o.optString("liveRtspUrl", "");
+        m.youtubeUrl = o.optString("youtubeUrl", "");
         m.isLocked = o.optBoolean("isLocked", false);
         m.audioEnabled = o.optBoolean("audioEnabled", false);
 

@@ -8,14 +8,16 @@ import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Lightweight local RTSP proxy to sanitize and fix non-standard H.265 SDP headers
- * emitted by IP cameras and adjust URLs.
+ * Robust local RTSP proxy.
+ * - Handles cameras that require Digest/Basic Authentication on OPTIONS, DESCRIBE, SETUP, and PLAY.
+ * - Strips credentials from URL authority to avoid Android's Uri '@' bug.
+ * - Injects missing H.265 SDP sprop-vps / sprop-sps / sprop-pps parameters.
  */
 public final class RtspProxy {
     private static final String TAG = "RtspProxy";
@@ -25,18 +27,20 @@ public final class RtspProxy {
     private static Thread sServerThread;
     private static volatile boolean sIsRunning = false;
 
-    // Exact NAL parameter sets for 192.168.1.114
     private static final String DEFAULT_VPS = "QAEMAf//AWAAAAMAAAMAAAMAAAMAlrwJ";
     private static final String DEFAULT_SPS_MAIN = "QgEBAWAAAAMAAAMAAAMAAAMAlqABaCAGWfeNvkkyIuWewCAAAH0gAAdU4QE=";
     private static final String DEFAULT_SPS_SUB = "QgEBAWAAAAMAAAMAAAMAAAMAWqAGAgGxY2uSTJrljAIAAAfSAABONBBBqAM=";
     private static final String DEFAULT_PPS = "RAHgdrAmQA==";
+
+    private static final Pattern RTSP_URL_PATTERN =
+            Pattern.compile("^rtsp://(?:([^:]+):(.*)@)?([^:/]+)(?::(\\d+))?(/.*)?$");
 
     public static synchronized void start() {
         if (sIsRunning) return;
         sIsRunning = true;
         sServerThread = new Thread(() -> {
             try {
-                sServerSocket = new ServerSocket(PROXY_PORT, 10, InetAddress.getByName("127.0.0.1"));
+                sServerSocket = new ServerSocket(PROXY_PORT, 20, InetAddress.getByName("127.0.0.1"));
                 Log.i(TAG, "RTSP Proxy listening on 127.0.0.1:" + PROXY_PORT);
                 while (sIsRunning) {
                     try {
@@ -71,37 +75,52 @@ public final class RtspProxy {
             return originalRtspUrl;
         }
 
-        // Jika kamera 192.168.1.114 meminta /ch1/main (resolusi 2880x1620 yang melampaui limit decoder 1920x1088 TV),
-        // otomatis switch ke /ch1/sub (substream 720p/D1) agar decoder hardware TV lancar memutar video!
-        String effectiveUrl = originalRtspUrl;
+        String effectiveUrl = originalRtspUrl.trim();
+
         if (effectiveUrl.contains("192.168.1.114") && effectiveUrl.contains("/ch1/main")) {
             Log.i(TAG, "Auto-switching 192.168.1.114 from 3K main-stream to 720p sub-stream for TV decoder compatibility");
             effectiveUrl = effectiveUrl.replace("/ch1/main", "/ch1/sub");
         }
 
-        try {
-            URI u = new URI(effectiveUrl);
-            String host = u.getHost();
-            int port = u.getPort() > 0 ? u.getPort() : 554;
-            String path = u.getRawPath();
-            if (path == null) path = "";
-            String query = u.getRawQuery();
-
-            StringBuilder sb = new StringBuilder();
-            sb.append("rtsp://127.0.0.1:").append(PROXY_PORT).append(path);
-            sb.append("?_dst_host=").append(host).append("&_dst_port=").append(port);
-
-            String userInfo = u.getUserInfo();
-            if (userInfo != null && !userInfo.isEmpty()) {
-                sb.append("&_auth=").append(Base64.encodeToString(userInfo.getBytes(StandardCharsets.UTF_8), Base64.NO_WRAP));
-            }
-            if (query != null && !query.isEmpty()) {
-                sb.append("&").append(query);
-            }
-            return sb.toString();
-        } catch (Exception e) {
+        Matcher m = RTSP_URL_PATTERN.matcher(effectiveUrl);
+        if (!m.matches()) {
             return originalRtspUrl;
         }
+
+        String user = m.group(1);
+        String pass = m.group(2);
+        String host = m.group(3);
+        String portStr = m.group(4);
+        String pathWithQuery = m.group(5);
+
+        int port = (portStr != null && !portStr.isEmpty()) ? Integer.parseInt(portStr) : 554;
+        if (pathWithQuery == null) pathWithQuery = "/";
+
+        String path = pathWithQuery;
+        String query = "";
+        int qIdx = pathWithQuery.indexOf('?');
+        if (qIdx != -1) {
+            path = pathWithQuery.substring(0, qIdx);
+            query = pathWithQuery.substring(qIdx + 1);
+        }
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("rtsp://127.0.0.1:").append(PROXY_PORT).append(path);
+
+        if (query != null && !query.isEmpty()) {
+            sb.append("?").append(query).append("&_dst_host=").append(host).append("&_dst_port=").append(port);
+        } else {
+            sb.append("?_dst_host=").append(host).append("&_dst_port=").append(port);
+        }
+
+        if (user != null) {
+            sb.append("&_u=").append(Base64.encodeToString(user.getBytes(StandardCharsets.UTF_8), Base64.NO_WRAP));
+        }
+        if (pass != null) {
+            sb.append("&_p=").append(Base64.encodeToString(pass.getBytes(StandardCharsets.UTF_8), Base64.NO_WRAP));
+        }
+
+        return sb.toString();
     }
 
     private static void handleConnection(Socket client) {
@@ -127,18 +146,27 @@ public final class RtspProxy {
             }
 
             String reqUri = parts[1];
-            URI u = new URI(reqUri);
-            String query = u.getQuery();
-            if (query == null) query = "";
+            String query = "";
+            int qIdx = reqUri.indexOf('?');
+            if (qIdx != -1) {
+                query = reqUri.substring(qIdx + 1);
+            }
 
             String dstHost = "192.168.1.114";
             int dstPort = 554;
-            String authParam = null;
+            String user = null;
+            String pass = null;
 
             for (String param : query.split("&")) {
-                if (param.startsWith("_dst_host=")) dstHost = param.substring(10);
-                else if (param.startsWith("_dst_port=")) dstPort = Integer.parseInt(param.substring(10));
-                else if (param.startsWith("_auth=")) authParam = param.substring(6);
+                if (param.startsWith("_dst_host=")) {
+                    dstHost = param.substring(10);
+                } else if (param.startsWith("_dst_port=")) {
+                    try { dstPort = Integer.parseInt(param.substring(10)); } catch (Exception ignored) {}
+                } else if (param.startsWith("_u=")) {
+                    try { user = new String(Base64.decode(param.substring(3), Base64.NO_WRAP), StandardCharsets.UTF_8); } catch (Exception ignored) {}
+                } else if (param.startsWith("_p=")) {
+                    try { pass = new String(Base64.decode(param.substring(3), Base64.NO_WRAP), StandardCharsets.UTF_8); } catch (Exception ignored) {}
+                }
             }
 
             target = new Socket(dstHost, dstPort);
@@ -146,22 +174,67 @@ public final class RtspProxy {
             InputStream inTarget = target.getInputStream();
             OutputStream outTarget = target.getOutputStream();
 
-            String sanitizedReq = sanitizeClientRequest(firstReq, dstHost, dstPort, authParam);
-            outTarget.write(sanitizedReq.getBytes(StandardCharsets.UTF_8));
+            final String fUser = user;
+            final String fPass = pass;
+            final String fHost = dstHost;
+            final int fPort = dstPort;
+
+            final String[] activeAuthHolder = new String[1]; // Holds current Digest/Basic header
+
+            // Forward first request
+            String cleanFirstReq = sanitizeClientRequest(firstReq, fHost, fPort);
+            outTarget.write(cleanFirstReq.getBytes(StandardCharsets.UTF_8));
             outTarget.flush();
 
-            Socket fTarget = target;
-            String fDstHost = dstHost;
-            int fDstPort = dstPort;
-            String fAuth = authParam;
+            // Read target response
+            byte[] targetBuf = new byte[16384];
+            int rTarget = inTarget.read(targetBuf);
+            if (rTarget <= 0) {
+                closeQuietly(client, target);
+                return;
+            }
 
+            String targetResp = new String(targetBuf, 0, rTarget, StandardCharsets.ISO_8859_1);
+
+            // If 401 Unauthorized, solve challenge immediately!
+            if (targetResp.startsWith("RTSP/1.0 401") && fUser != null && fPass != null) {
+                String method = parts[0];
+                String uri = extractTargetUri(cleanFirstReq);
+                activeAuthHolder[0] = computeAuthHeader(targetResp, method, uri, fUser, fPass);
+
+                if (activeAuthHolder[0] != null) {
+                    String authedReq = injectAuth(cleanFirstReq, activeAuthHolder[0]);
+                    outTarget.write(authedReq.getBytes(StandardCharsets.UTF_8));
+                    outTarget.flush();
+
+                    rTarget = inTarget.read(targetBuf);
+                    if (rTarget <= 0) {
+                        closeQuietly(client, target);
+                        return;
+                    }
+                }
+            }
+
+            byte[] processed = fixSdpResponse(targetBuf, rTarget);
+            outClient.write(processed);
+            outClient.flush();
+
+            final Socket fTarget = target;
+
+            // Pipe Client -> Target (translates URIs & injects fresh Auth per method/uri)
             Thread tUp = new Thread(() -> {
                 try {
                     byte[] upBuf = new byte[8192];
                     int r;
                     while ((r = inClient.read(upBuf)) > 0) {
                         String s = new String(upBuf, 0, r, StandardCharsets.UTF_8);
-                        String clean = sanitizeClientRequest(s, fDstHost, fDstPort, fAuth);
+                        String clean = sanitizeClientRequest(s, fHost, fPort);
+                        if (activeAuthHolder[0] != null && !clean.contains("Authorization:")) {
+                            String mth = clean.split(" ")[0];
+                            String uTarget = extractTargetUri(clean);
+                            String dynAuth = computeDigestAuth(activeAuthHolder[0], mth, uTarget, fUser, fPass);
+                            clean = injectAuth(clean, dynAuth != null ? dynAuth : activeAuthHolder[0]);
+                        }
                         outTarget.write(clean.getBytes(StandardCharsets.UTF_8));
                         outTarget.flush();
                     }
@@ -169,13 +242,14 @@ public final class RtspProxy {
                 closeQuietly(client, fTarget);
             });
 
+            // Pipe Target -> Client (re-calculates SDP if needed)
             Thread tDown = new Thread(() -> {
                 try {
                     byte[] downBuf = new byte[16384];
                     int r;
                     while ((r = inTarget.read(downBuf)) > 0) {
-                        byte[] processed = fixSdpResponse(downBuf, r);
-                        outClient.write(processed);
+                        byte[] p = fixSdpResponse(downBuf, r);
+                        outClient.write(p);
                         outClient.flush();
                     }
                 } catch (Exception ignored) {}
@@ -191,26 +265,87 @@ public final class RtspProxy {
         }
     }
 
-    private static String sanitizeClientRequest(String req, String dstHost, int dstPort, String authParam) {
-        String s = req.replace("127.0.0.1:" + PROXY_PORT, dstHost + ":" + dstPort);
-        s = s.replaceAll("\\?_dst_host=[^\\s&]+", "");
-        s = s.replaceAll("&_dst_host=[^\\s&]+", "");
-        s = s.replaceAll("\\?_dst_port=[^\\s&]+", "");
-        s = s.replaceAll("&_dst_port=[^\\s&]+", "");
-        s = s.replaceAll("\\?_auth=[^\\s&]+", "");
-        s = s.replaceAll("&_auth=[^\\s&]+", "");
-
-        if (authParam != null && !s.contains("Authorization:")) {
-            s = s.replaceFirst("\r\n", "\r\nAuthorization: Basic " + authParam + "\r\n");
+    private static String extractTargetUri(String req) {
+        try {
+            String[] parts = req.split("\r\n")[0].split(" ");
+            return parts[1];
+        } catch (Exception e) {
+            return "";
         }
+    }
+
+    private static String injectAuth(String req, String authHeader) {
+        return req.replaceFirst("\r\n", "\r\nAuthorization: " + authHeader + "\r\n");
+    }
+
+    private static String computeAuthHeader(String resp401, String method, String uri, String user, String pass) {
+        if (resp401.contains("Digest")) {
+            Pattern realmPat = Pattern.compile("realm=\"([^\"]+)\"");
+            Pattern noncePat = Pattern.compile("nonce=\"([^\"]+)\"");
+            Matcher mR = realmPat.matcher(resp401);
+            Matcher mN = noncePat.matcher(resp401);
+            if (mR.find() && mN.find()) {
+                String realm = mR.group(1);
+                String nonce = mN.group(1);
+                String ha1 = md5(user + ":" + realm + ":" + pass);
+                String ha2 = md5(method + ":" + uri);
+                String response = md5(ha1 + ":" + nonce + ":" + ha2);
+                return "Digest username=\"" + user + "\", realm=\"" + realm + "\", nonce=\"" + nonce + "\", uri=\"" + uri + "\", response=\"" + response + "\"";
+            }
+        }
+        String cred = Base64.encodeToString((user + ":" + pass).getBytes(StandardCharsets.UTF_8), Base64.NO_WRAP);
+        return "Basic " + cred;
+    }
+
+    private static String computeDigestAuth(String baseAuth, String method, String uri, String user, String pass) {
+        if (baseAuth == null || !baseAuth.startsWith("Digest")) return baseAuth;
+        try {
+            Pattern realmPat = Pattern.compile("realm=\"([^\"]+)\"");
+            Pattern noncePat = Pattern.compile("nonce=\"([^\"]+)\"");
+            Matcher mR = realmPat.matcher(baseAuth);
+            Matcher mN = noncePat.matcher(baseAuth);
+            if (mR.find() && mN.find()) {
+                String realm = mR.group(1);
+                String nonce = mN.group(1);
+                String ha1 = md5(user + ":" + realm + ":" + pass);
+                String ha2 = md5(method + ":" + uri);
+                String response = md5(ha1 + ":" + nonce + ":" + ha2);
+                return "Digest username=\"" + user + "\", realm=\"" + realm + "\", nonce=\"" + nonce + "\", uri=\"" + uri + "\", response=\"" + response + "\"";
+            }
+        } catch (Exception ignored) {}
+        return baseAuth;
+    }
+
+    private static String md5(String input) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("MD5");
+            byte[] d = md.digest(input.getBytes(StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder();
+            for (byte b : d) {
+                sb.append(String.format("%02x", b));
+            }
+            return sb.toString();
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    private static String sanitizeClientRequest(String req, String dstHost, int dstPort) {
+        String s = req.replaceAll("127\\.0\\.0\\.1:" + PROXY_PORT, dstHost + ":" + dstPort);
+        s = s.replaceAll("[?&]_dst_host=[^\\s&]+", "");
+        s = s.replaceAll("[?&]_dst_port=[^\\s&]+", "");
+        s = s.replaceAll("[?&]_u=[^\\s&]+", "");
+        s = s.replaceAll("[?&]_p=[^\\s&]+", "");
+        // Jika query string asli menjadi diawali '&' setelah parameter proxy dihapus, ubah ke '?'
+        s = s.replaceAll("/&", "/?");
+        s = s.replaceAll("\\?&", "?");
         return s;
     }
 
     private static byte[] fixSdpResponse(byte[] data, int length) {
         String s = new String(data, 0, length, StandardCharsets.ISO_8859_1);
         if (s.contains("m=video") && s.contains("H265")) {
-            // Jika ada parameter H265 tapi missing sprop-vps atau parameter sets tidak lengkap
-            if (s.contains("sprop-parameter-sets=") || !s.contains("sprop-vps")) {
+            if (!s.contains("sprop-vps")) {
                 Pattern pat = Pattern.compile("a=fmtp:(\\d+)[^\\r\\n]+");
                 Matcher m = pat.matcher(s);
                 if (m.find()) {
@@ -231,7 +366,7 @@ public final class RtspProxy {
                             s = header;
                         }
                     }
-                    Log.i(TAG, "Patched H.265 SDP with exact stream SPS, PPS & VPS");
+                    Log.i(TAG, "Patched missing H.265 sprop-vps in SDP successfully");
                     return s.getBytes(StandardCharsets.ISO_8859_1);
                 }
             }

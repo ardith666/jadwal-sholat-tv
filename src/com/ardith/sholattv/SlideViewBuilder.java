@@ -35,6 +35,8 @@ public final class SlideViewBuilder {
 
     public interface StreamHolder {
         void registerPlayer(ExoPlayer player);
+        void registerWebView(android.webkit.WebView webView);
+        void onVideoEnded();
     }
 
     public static View buildSlideView(Context ctx, SlideModel model, SlideManager sm, StreamHolder holder) {
@@ -48,6 +50,8 @@ public final class SlideViewBuilder {
             }
         } else if (SlideModel.TYPE_LIVE_STREAM.equals(model.type)) {
             return buildLiveStreamView(ctx, model, holder);
+        } else if (SlideModel.TYPE_YOUTUBE.equals(model.type)) {
+            return buildYouTubeView(ctx, model, holder);
         } else if (SlideModel.TYPE_CCTV.equals(model.type)) {
             return buildCctvGridView(ctx, model, holder);
         } else if (SlideModel.TYPE_IMAGE.equals(model.type)) {
@@ -395,6 +399,133 @@ public final class SlideViewBuilder {
         root.addView(hint, hLp);
 
         return root;
+    }
+
+    // ==========================================
+    // 3B. YOUTUBE VIDEO / LIVE STREAM (WEBVIEW IFRAME)
+    // ==========================================
+    private static View buildYouTubeView(Context ctx, SlideModel m, StreamHolder holder) {
+        FrameLayout root = new FrameLayout(ctx);
+        root.setLayoutParams(new ViewGroup.LayoutParams(-1, -1));
+        root.setBackgroundColor(0xFF000000);
+
+        android.webkit.WebView webView = new android.webkit.WebView(ctx);
+        webView.setLayoutParams(new FrameLayout.LayoutParams(-1, -1));
+        android.webkit.WebSettings ws = webView.getSettings();
+        ws.setJavaScriptEnabled(true);
+        ws.setMediaPlaybackRequiresUserGesture(false);
+        ws.setDomStorageEnabled(true);
+        ws.setDatabaseEnabled(true);
+        ws.setUserAgentString("Mozilla/5.0 (Linux; Android 14; Android TV) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+
+        String videoId = extractYouTubeVideoId(m.youtubeUrl);
+        String embedHtml = "<!DOCTYPE html><html><head>"
+                + "<meta name='viewport' content='width=device-width, initial-scale=1.0'>"
+                + "<style>body,html{margin:0;padding:0;width:100%;height:100%;background:#000;overflow:hidden;}"
+                + "iframe{width:100%;height:100%;border:none;}</style></head><body>"
+                + "<div id='player'></div>"
+                + "<script>"
+                + "var tag = document.createElement('script'); tag.src = 'https://www.youtube.com/iframe_api';"
+                + "var firstScriptTag = document.getElementsByTagName('script')[0]; firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);"
+                + "var player;"
+                + "function onYouTubeIframeAPIReady() {"
+                + "  player = new YT.Player('player', {"
+                + "    videoId: '" + videoId + "',"
+                + "    playerVars: { 'autoplay': 1, 'controls': 0, 'rel': 0, 'playsinline': 1, 'modestbranding': 1 },"
+                + "    events: { 'onReady': onPlayerReady, 'onStateChange': onPlayerStateChange }"
+                + "  });"
+                + "}"
+                + "function onPlayerReady(event) { event.target.playVideo(); }"
+                + "function onPlayerStateChange(event) {"
+                + "  if (event.data === YT.PlayerState.ENDED) { Android.onEnded(); }"
+                + "}"
+                + "</script></body></html>";
+
+        webView.addJavascriptInterface(new Object() {
+            @android.webkit.JavascriptInterface
+            public void onEnded() {
+                if (holder != null) {
+                    ((android.app.Activity) ctx).runOnUiThread(holder::onVideoEnded);
+                }
+            }
+        }, "Android");
+
+        webView.loadDataWithBaseURL("https://www.youtube.com", embedHtml, "text/html", "UTF-8", null);
+
+        if (holder != null) {
+            holder.registerWebView(webView);
+        }
+        root.addView(webView);
+
+        // Header YouTube Live Badge
+        LinearLayout badge = new LinearLayout(ctx);
+        badge.setOrientation(LinearLayout.HORIZONTAL);
+        badge.setGravity(Gravity.CENTER_VERTICAL);
+        badge.setPadding(dp(ctx, 14), dp(ctx, 6), dp(ctx, 16), dp(ctx, 6));
+
+        GradientDrawable badgeBg = new GradientDrawable();
+        badgeBg.setCornerRadius(dp(ctx, 14));
+        badgeBg.setColor(0xCC000000);
+        badgeBg.setStroke(dp(ctx, 1), 0x4DF85149);
+        badge.setBackground(badgeBg);
+
+        TextView redDot = new TextView(ctx);
+        redDot.setText("▶ ");
+        redDot.setTextColor(0xFFE50914);
+        redDot.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+        badge.addView(redDot);
+
+        TextView ytTxt = new TextView(ctx);
+        ytTxt.setText("YOUTUBE");
+        ytTxt.setTextColor(0xFFFFFFFF);
+        ytTxt.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+        ytTxt.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+        badge.addView(ytTxt);
+
+        FrameLayout.LayoutParams bLp = new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.START);
+        bLp.setMargins(dp(ctx, 24), dp(ctx, 20), 0, 0);
+        root.addView(badge, bLp);
+
+        // Footer Hint
+        TextView hint = new TextView(ctx);
+        hint.setText(m.isLocked ? "🔒 Layar Terkunci | Tekan tombol BACK pada remote untuk keluar" : "");
+        hint.setTextColor(0xB3FFFFFF);
+        hint.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
+        hint.setPadding(dp(ctx, 12), dp(ctx, 6), dp(ctx, 12), dp(ctx, 6));
+
+        GradientDrawable hintBg = new GradientDrawable();
+        hintBg.setCornerRadius(dp(ctx, 10));
+        hintBg.setColor(0x80000000);
+        hint.setBackground(hintBg);
+
+        FrameLayout.LayoutParams hLp = new FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM | Gravity.END);
+        hLp.setMargins(0, 0, dp(ctx, 24), dp(ctx, 18));
+        root.addView(hint, hLp);
+
+        return root;
+    }
+
+    private static String extractYouTubeVideoId(String url) {
+        if (url == null || url.isEmpty()) return "";
+        String vId = "";
+        try {
+            if (url.contains("v=")) {
+                String[] p = url.split("v=")[1].split("&");
+                vId = p[0];
+            } else if (url.contains("youtu.be/")) {
+                String[] p = url.split("youtu.be/")[1].split("\\?");
+                vId = p[0];
+            } else if (url.contains("live/")) {
+                String[] p = url.split("live/")[1].split("\\?");
+                vId = p[0];
+            } else if (url.contains("embed/")) {
+                String[] p = url.split("embed/")[1].split("\\?");
+                vId = p[0];
+            } else {
+                vId = url;
+            }
+        } catch (Exception ignored) {}
+        return vId;
     }
 
     // ==========================================

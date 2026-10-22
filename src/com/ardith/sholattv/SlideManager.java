@@ -163,11 +163,17 @@ public final class SlideManager {
         s5.cctvStreams.add(new SlideModel.CctvStream("Kamera Utama / Shaf Depan", "rtsp://admin:LNUMXL@192.168.1.114:554/ch1/main"));
         s5.cctvStreams.add(new SlideModel.CctvStream("Kamera Tempat Wudhu & Parkir", "rtsp://admin:LNUMXL@192.168.1.114:554/ch1/main"));
 
+        // Slide 6: Template YouTube Live / Video (DEFAULT NON-AKTIF)
+        SlideModel s6 = new SlideModel("slide_youtube_stream", SlideModel.TYPE_YOUTUBE, "Kajian YouTube Live / Video", false, 180);
+        s6.youtubeUrl = "https://www.youtube.com/watch?v=live_stream";
+        s6.isLocked = true;
+
         slides.add(s1);
         slides.add(s2);
         slides.add(s3);
         slides.add(s4);
         slides.add(s5);
+        slides.add(s6);
     }
 
     public synchronized void persist() {

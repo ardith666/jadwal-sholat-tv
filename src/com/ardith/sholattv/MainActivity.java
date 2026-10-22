@@ -57,6 +57,7 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
 
     // Active ExoPlayers to release when changing slides or pausing
     private final List<ExoPlayer> activePlayers = new ArrayList<>();
+    private final List<android.webkit.WebView> activeWebViews = new ArrayList<>();
 
     private TextView clockText;
     private TextView dateText;
@@ -114,6 +115,19 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
         }
     }
 
+    @Override
+    public void registerWebView(android.webkit.WebView webView) {
+        if (webView != null && !activeWebViews.contains(webView)) {
+            activeWebViews.add(webView);
+        }
+    }
+
+    @Override
+    public void onVideoEnded() {
+        Log.i(TAG, "YouTube video ended, advancing to next slide automatically");
+        advanceToNextSlide();
+    }
+
     private void stopAllVideoStreams() {
         for (ExoPlayer player : activePlayers) {
             try {
@@ -124,6 +138,16 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
             } catch (Exception ignored) {}
         }
         activePlayers.clear();
+
+        for (android.webkit.WebView wv : activeWebViews) {
+            try {
+                if (wv != null) {
+                    wv.loadUrl("about:blank");
+                    wv.destroy();
+                }
+            } catch (Exception ignored) {}
+        }
+        activeWebViews.clear();
     }
 
     @Override
@@ -437,8 +461,8 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
 
         SlideModel current = activeSlides.get(currentSlideIndex % activeSlides.size());
 
-        if (SlideModel.TYPE_LIVE_STREAM.equals(current.type) && current.isLocked) {
-            Log.i(TAG, "Live Stream slide is locked, pausing automatic slide rotation");
+        if ((SlideModel.TYPE_LIVE_STREAM.equals(current.type) || SlideModel.TYPE_YOUTUBE.equals(current.type)) && current.isLocked) {
+            Log.i(TAG, "Live Stream / YouTube slide is locked, pausing automatic slide rotation");
             return;
         }
 
@@ -449,7 +473,7 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
     private void advanceToNextSlide() {
         if (activeSlides.size() <= 1 || isAdzanApproaching) return;
         SlideModel current = activeSlides.get(currentSlideIndex % activeSlides.size());
-        if (SlideModel.TYPE_LIVE_STREAM.equals(current.type) && current.isLocked) return;
+        if ((SlideModel.TYPE_LIVE_STREAM.equals(current.type) || SlideModel.TYPE_YOUTUBE.equals(current.type)) && current.isLocked) return;
 
         currentSlideIndex = (currentSlideIndex + 1) % activeSlides.size();
         showSlideAt(currentSlideIndex);
@@ -492,7 +516,7 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
         if (keyCode == KeyEvent.KEYCODE_BACK) {
             if (!activeSlides.isEmpty()) {
                 SlideModel cur = activeSlides.get(currentSlideIndex % activeSlides.size());
-                if (SlideModel.TYPE_LIVE_STREAM.equals(cur.type)) {
+                if (SlideModel.TYPE_LIVE_STREAM.equals(cur.type) || SlideModel.TYPE_YOUTUBE.equals(cur.type)) {
                     exitLiveStream();
                     return true;
                 }
@@ -535,7 +559,7 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
     public void onBackPressed() {
         if (!activeSlides.isEmpty()) {
             SlideModel cur = activeSlides.get(currentSlideIndex % activeSlides.size());
-            if (SlideModel.TYPE_LIVE_STREAM.equals(cur.type)) {
+            if (SlideModel.TYPE_LIVE_STREAM.equals(cur.type) || SlideModel.TYPE_YOUTUBE.equals(cur.type)) {
                 exitLiveStream();
                 return;
             }
@@ -544,11 +568,11 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
     }
 
     private void exitLiveStream() {
-        Toast.makeText(this, "Siaran Live ditutup. Kembali ke jadwal normal.", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "Siaran Live / YouTube ditutup. Kembali ke jadwal normal.", Toast.LENGTH_SHORT).show();
         stopAllVideoStreams();
 
         for (SlideModel s : slideManager.getAllSlides()) {
-            if (SlideModel.TYPE_LIVE_STREAM.equals(s.type)) {
+            if (SlideModel.TYPE_LIVE_STREAM.equals(s.type) || SlideModel.TYPE_YOUTUBE.equals(s.type)) {
                 s.isLocked = false;
                 s.enabled = false;
             }

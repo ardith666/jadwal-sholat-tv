@@ -86,3 +86,9 @@
   - Solusi: Menambahkan explicit interceptor pada `onKeyDown(KEYCODE_DPAD_UP)` untuk langsung memberikan fokus ke `settingsBtn.requestFocus()`
   - Tombol Kiri/Kanan dibatasi hanya mengganti slide jika header Pengaturan sedang tidak dalam keadaan fokus
   - Status: ✅ Teruji di TV TCL (Screenshots: backup/tcl-39-settings-focused-dpad-up.png, backup/tcl-40-settings-opened-by-dpad.png) & di-push ke GitHub (Commit 86037ff)
+
+- [2026-10-21 13:40] Perencanaan Fitur YouTube Live/Video & Integrasi Stream Kamera:
+  - Slide YouTube: Mendukung link video atau live streaming YouTube (lock mode hingga video selesai atau ditekan tombol Back)
+  - Parser URL RTSP: Perbaikan sanitasi query string dan kredensial kamera dengan karakter khusus (@)
+  - Integrasi Multi-CCTV & Live Kajian: Struktur data model v1.5 siap
+  - Status: 📝 Dicatat dalam Todo List untuk sesi pengerjaan berikutnya

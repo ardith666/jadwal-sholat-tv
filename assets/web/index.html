@@ -161,6 +161,7 @@
                 <option value="ANNOUNCEMENT">Agenda & Pengumuman (Hero + Daftar 6)</option>
                 <option value="LIVE_STREAM">Live Streaming Kajian / Khotbah (RTSP Single)</option>
                 <option value="CCTV">Multi-Stream CCTV Pengawasan (RTSP Grid)</option>
+                <option value="YOUTUBE">YouTube Live / Video Player (Web)</option>
                 <option value="IMAGE">Poster Gambar / Flyer Kajian</option>
               </select>
             </div>
@@ -236,6 +237,18 @@
             </div>
             <p style="font-size: 11px; color: var(--text-dim); margin-bottom: 12px;">Masukkan URL RTSP masing-masing kamera pengawasan. Layout grid (1x1, 1x2, 2x2, 2x3) menyesuaikan otomatis.</p>
             <div id="cctvStreamsContainer" style="display: flex; flex-direction: column; gap: 10px;"></div>
+          </div>
+
+          <!-- DYNAMIC FIELDS: YOUTUBE -->
+          <div id="fieldsYoutube" class="dynamic-section hidden">
+            <h4>🔴 YouTube Live / Video Player</h4>
+            <div class="form-group">
+              <label for="youtubeUrl">URL / Link YouTube</label>
+              <input type="text" id="youtubeUrl" class="form-control" placeholder="https://www.youtube.com/watch?v=XXXX atau https://youtu.be/XXXX">
+            </div>
+            <div class="checkbox-group">
+              <label><input type="checkbox" id="chkLockYoutube" checked> 🔒 <b>Kunci Layar TV Selama Video Berjalan</b> (Tekan tombol Back di remote untuk keluar)</label>
+            </div>
           </div>
 
           <!-- DYNAMIC FIELDS: IMAGE POSTER -->

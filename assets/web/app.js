@@ -115,6 +115,8 @@ function renderSlides(slides) {
           : "Belum ada agenda.";
     } else if (s.type === "LIVE_STREAM") {
       detailText = `RTSP: ${s.liveRtspUrl || '-'} | Lock: ${s.isLocked ? 'Aktif (Kunci Layar)' : 'Non-aktif'}`;
+    } else if (s.type === "YOUTUBE") {
+      detailText = `YouTube: ${s.youtubeUrl || '-'} | Lock: ${s.isLocked ? 'Aktif (Kunci Layar)' : 'Non-aktif'}`;
     } else if (s.type === "CCTV") {
       const count = (s.cctvStreams || []).length;
       detailText = `${count} Kamera CCTV Terpasang (Grid Responsif 1x1 s/d 2x3).`;
@@ -232,6 +234,9 @@ function initSlideEditor() {
       slide.liveRtspUrl = document.getElementById("liveRtspUrl").value.trim();
       slide.isLocked = document.getElementById("chkLockLive").checked;
       slide.audioEnabled = document.getElementById("chkAudioLive").checked;
+    } else if (type === "YOUTUBE") {
+      slide.youtubeUrl = document.getElementById("youtubeUrl").value.trim();
+      slide.isLocked = document.getElementById("chkLockYoutube").checked;
     } else if (type === "CCTV") {
       slide.cctvStreams = collectCctvStreams();
     } else if (type === "IMAGE") {
@@ -264,6 +269,7 @@ function updateDynamicSections(type) {
   if (type === "KAS") document.getElementById("fieldsKas").classList.remove("hidden");
   else if (type === "ANNOUNCEMENT") document.getElementById("fieldsAnnouncement").classList.remove("hidden");
   else if (type === "LIVE_STREAM") document.getElementById("fieldsLiveStream").classList.remove("hidden");
+  else if (type === "YOUTUBE") document.getElementById("fieldsYoutube").classList.remove("hidden");
   else if (type === "CCTV") document.getElementById("fieldsCctv").classList.remove("hidden");
   else if (type === "IMAGE") document.getElementById("fieldsImage").classList.remove("hidden");
 }
@@ -315,6 +321,10 @@ function openSlideEditor(slide) {
   document.getElementById("liveRtspUrl").value = (slide && slide.liveRtspUrl) ? slide.liveRtspUrl : "rtsp://admin:LNUMXL@192.168.1.114:554/ch1/main";
   document.getElementById("chkLockLive").checked = slide ? (slide.isLocked !== false) : true;
   document.getElementById("chkAudioLive").checked = slide ? (slide.audioEnabled === true) : false;
+
+  // Pre-fill YouTube
+  document.getElementById("youtubeUrl").value = (slide && slide.youtubeUrl) ? slide.youtubeUrl : "https://www.youtube.com/watch?v=live_stream";
+  document.getElementById("chkLockYoutube").checked = slide ? (slide.isLocked !== false) : true;
 
   // Pre-fill CCTV
   const cctvContainer = document.getElementById("cctvStreamsContainer");
