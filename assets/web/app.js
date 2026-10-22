@@ -122,14 +122,27 @@ function renderSlides(slides) {
       detailText = `${count} Kamera CCTV Terpasang (Grid Responsif 1x1 s/d 2x3).`;
     } else if (s.type === "IMAGE") {
       detailText = `Poster Gambar: ${s.imageFileName || 'Belum ada gambar'}`;
+    } else if (s.type === "MULTI_PANEL") {
+      detailText = `Preset: ${s.multiPanelPreset || 'SPLIT'} | Kiri: ${s.slotLeftType || 'LIVE'} | Kanan: ${s.slotRightType || 'PRAYER'}`;
     }
+
+    card.setAttribute("draggable", "true");
+    card.dataset.index = idx;
+    card.dataset.id = s.id;
 
     card.innerHTML = `
       <div class="slide-header">
-        <span class="slide-badge ${badgeClass}">${s.type}</span>
-        <span class="slide-duration">⏱ ${s.durationSec}s</span>
+        <div class="slide-header-left">
+          <span class="drag-handle" title="Tahan dan geser untuk ubah urutan" onclick="moveSlidePrompt('${s.id}')">☰</span>
+          <span class="slide-badge ${badgeClass}">${s.type}</span>
+        </div>
+        <div style="display: flex; gap: 4px; align-items: center;">
+          <button class="btn btn-secondary btn-sm" style="padding: 2px 6px;" title="Pindah ke Atas" onclick="moveSlideUp(${idx})">▲</button>
+          <button class="btn btn-secondary btn-sm" style="padding: 2px 6px;" title="Pindah ke Bawah" onclick="moveSlideDown(${idx})">▼</button>
+          <span class="slide-duration" style="margin-left: 6px;">⏱ ${s.durationSec}s</span>
+        </div>
       </div>
-      <div class="slide-title">${idx + 1}. ${s.title}</div>
+      <div class="slide-title">#${idx + 1}. ${s.title}</div>
       <div class="slide-detail">${detailText}</div>
       <div class="slide-actions">
         <label class="switch-label">
@@ -142,8 +155,72 @@ function renderSlides(slides) {
         </div>
       </div>
     `;
+
+    // HTML5 Drag & Drop reorder
+    card.addEventListener("dragstart", handleDragStart);
+    card.addEventListener("dragover", handleDragOver);
+    card.addEventListener("drop", handleDrop);
+    card.addEventListener("dragend", handleDragEnd);
+
     container.appendChild(card);
   });
+}
+
+let dragSrcIndex = -1;
+
+function handleDragStart(e) {
+  dragSrcIndex = parseInt(this.dataset.index);
+  this.classList.add("dragging");
+  e.dataTransfer.effectAllowed = "move";
+}
+
+function handleDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = "move";
+}
+
+async function handleDrop(e) {
+  e.preventDefault();
+  const targetIndex = parseInt(this.dataset.index);
+  if (dragSrcIndex !== -1 && dragSrcIndex !== targetIndex) {
+    const movedItem = cachedSlides.splice(dragSrcIndex, 1)[0];
+    cachedSlides.splice(targetIndex, 0, movedItem);
+    await saveSlidesToServer();
+  }
+}
+
+function handleDragEnd() {
+  document.querySelectorAll(".slide-card").forEach(c => c.classList.remove("dragging"));
+}
+
+async function moveSlideUp(index) {
+  if (index > 0) {
+    const item = cachedSlides.splice(index, 1)[0];
+    cachedSlides.splice(index - 1, 0, item);
+    await saveSlidesToServer();
+  }
+}
+
+async function moveSlideDown(index) {
+  if (index < cachedSlides.length - 1) {
+    const item = cachedSlides.splice(index, 1)[0];
+    cachedSlides.splice(index + 1, 0, item);
+    await saveSlidesToServer();
+  }
+}
+
+async function moveSlidePrompt(id) {
+  const idx = cachedSlides.findIndex(s => s.id === id);
+  if (idx === -1) return;
+  const newPos = prompt(`Pindahkan slide '${cachedSlides[idx].title}' ke nomor urut (1 - ${cachedSlides.length}):`, idx + 1);
+  if (newPos) {
+    const p = parseInt(newPos) - 1;
+    if (!isNaN(p) && p >= 0 && p < cachedSlides.length && p !== idx) {
+      const item = cachedSlides.splice(idx, 1)[0];
+      cachedSlides.splice(p, 0, item);
+      await saveSlidesToServer();
+    }
+  }
 }
 
 async function toggleSlide(id, enabled) {
@@ -252,6 +329,14 @@ function initSlideEditor() {
         });
         slide.imageFileName = fileName;
       }
+    } else if (type === "MULTI_PANEL") {
+      slide.multiPanelPreset = document.getElementById("panelPreset").value;
+      slide.slotLeftType = document.getElementById("slotLeftType").value;
+      slide.slotLeftUrl = document.getElementById("slotLeftUrl").value.trim();
+      slide.slotRightType = document.getElementById("slotRightType").value;
+      slide.slotThirdType = document.getElementById("slotThirdType").value;
+      slide.runningText = document.getElementById("runningTextInput").value.trim();
+      slide.runningTextBg = document.getElementById("runningTextBg").value;
     }
 
     await saveSlidesToServer();
@@ -265,12 +350,15 @@ function updateDynamicSections(type) {
   document.getElementById("fieldsLiveStream").classList.add("hidden");
   document.getElementById("fieldsCctv").classList.add("hidden");
   document.getElementById("fieldsImage").classList.add("hidden");
+  document.getElementById("fieldsYoutube").classList.add("hidden");
+  document.getElementById("fieldsMultiPanel").classList.add("hidden");
 
   if (type === "KAS") document.getElementById("fieldsKas").classList.remove("hidden");
   else if (type === "ANNOUNCEMENT") document.getElementById("fieldsAnnouncement").classList.remove("hidden");
   else if (type === "LIVE_STREAM") document.getElementById("fieldsLiveStream").classList.remove("hidden");
   else if (type === "YOUTUBE") document.getElementById("fieldsYoutube").classList.remove("hidden");
   else if (type === "CCTV") document.getElementById("fieldsCctv").classList.remove("hidden");
+  else if (type === "MULTI_PANEL") document.getElementById("fieldsMultiPanel").classList.remove("hidden");
   else if (type === "IMAGE") document.getElementById("fieldsImage").classList.remove("hidden");
 }
 
@@ -325,6 +413,15 @@ function openSlideEditor(slide) {
   // Pre-fill YouTube
   document.getElementById("youtubeUrl").value = (slide && slide.youtubeUrl) ? slide.youtubeUrl : "https://www.youtube.com/watch?v=live_stream";
   document.getElementById("chkLockYoutube").checked = slide ? (slide.isLocked !== false) : true;
+
+  // Pre-fill Multi-Panel
+  document.getElementById("panelPreset").value = (slide && slide.multiPanelPreset) ? slide.multiPanelPreset : "SPLIT_60_40";
+  document.getElementById("slotLeftType").value = (slide && slide.slotLeftType) ? slide.slotLeftType : "LIVE_STREAM";
+  document.getElementById("slotLeftUrl").value = (slide && slide.slotLeftUrl) ? slide.slotLeftUrl : "";
+  document.getElementById("slotRightType").value = (slide && slide.slotRightType) ? slide.slotRightType : "PRAYER";
+  document.getElementById("slotThirdType").value = (slide && slide.slotThirdType) ? slide.slotThirdType : "KAS";
+  document.getElementById("runningTextInput").value = (slide && slide.runningText) ? slide.runningText : "Lurus dan rapatkan shaf saat sholat berjamaah...";
+  document.getElementById("runningTextBg").value = (slide && slide.runningTextBg) ? slide.runningTextBg : "GREEN";
 
   // Pre-fill CCTV
   const cctvContainer = document.getElementById("cctvStreamsContainer");
@@ -469,6 +566,14 @@ function populateSettings(s) {
   document.getElementById("chkCountdownAudio").checked = s.countdownAudioEnabled !== false;
   document.getElementById("chkKeepAwake").checked = s.keepAwake !== false;
 
+  document.getElementById("chkIqomahEnabled").checked = s.iqomahEnabled !== false;
+  document.getElementById("iqomahSubuh").value = s.iqomahSubuh || 10;
+  document.getElementById("iqomahDzuhur").value = s.iqomahDzuhur || 5;
+  document.getElementById("iqomahAshar").value = s.iqomahAshar || 5;
+  document.getElementById("iqomahMaghrib").value = s.iqomahMaghrib || 7;
+  document.getElementById("iqomahIsya").value = s.iqomahIsya || 5;
+  document.getElementById("greenScreenDuration").value = s.greenScreenDuration || 60;
+
   document.getElementById("chkShowArab").checked = s.showArab !== false;
   document.getElementById("chkShowLatin").checked = s.showLatin !== false;
   document.getElementById("chkShowTrans").checked = s.showTranslation !== false;
@@ -487,6 +592,13 @@ function initSettingsForm() {
       countdownEnabled: document.getElementById("chkCountdown").checked,
       countdownAudioEnabled: document.getElementById("chkCountdownAudio").checked,
       keepAwake: document.getElementById("chkKeepAwake").checked,
+      iqomahEnabled: document.getElementById("chkIqomahEnabled").checked,
+      iqomahSubuh: parseInt(document.getElementById("iqomahSubuh").value) || 10,
+      iqomahDzuhur: parseInt(document.getElementById("iqomahDzuhur").value) || 5,
+      iqomahAshar: parseInt(document.getElementById("iqomahAshar").value) || 5,
+      iqomahMaghrib: parseInt(document.getElementById("iqomahMaghrib").value) || 7,
+      iqomahIsya: parseInt(document.getElementById("iqomahIsya").value) || 5,
+      greenScreenDuration: parseInt(document.getElementById("greenScreenDuration").value) || 60,
       showArab: document.getElementById("chkShowArab").checked,
       showLatin: document.getElementById("chkShowLatin").checked,
       showTranslation: document.getElementById("chkShowTrans").checked

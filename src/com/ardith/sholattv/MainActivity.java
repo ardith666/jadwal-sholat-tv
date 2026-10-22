@@ -55,9 +55,22 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
     private List<SlideModel> activeSlides = new ArrayList<>();
     private boolean isAdzanApproaching = false;
 
-    // Active ExoPlayers to release when changing slides or pausing
+        // Active ExoPlayers to release when changing slides or pausing
     private final List<ExoPlayer> activePlayers = new ArrayList<>();
     private final List<android.webkit.WebView> activeWebViews = new ArrayList<>();
+
+    // Overlay State: Iqomah Countdown Besar & Layar Hijau Sholat
+    private FrameLayout iqomahOverlay;
+    private TextView iqomahCountdownText;
+    private TextView iqomahLabelText;
+
+    private FrameLayout greenScreenOverlay;
+    private TextView greenScreenText;
+
+    private boolean isIqomahPhaseActive = false;
+    private long iqomahTargetTimestamp = 0;
+    private long greenScreenEndTimestamp = 0;
+    private String currentPrayerNameForIqomah = "";
 
     private TextView clockText;
     private TextView dateText;
@@ -411,6 +424,87 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
         content.addView(footer, new LinearLayout.LayoutParams(-1, -2));
 
         rootLayout.addView(content);
+
+        // ==========================================
+        // 5. IQOMAH OVERLAY (COUNTDOWN BESAR TENGAH LAYAR)
+        // ==========================================
+        iqomahOverlay = new FrameLayout(this);
+        iqomahOverlay.setLayoutParams(new FrameLayout.LayoutParams(-1, -1));
+        iqomahOverlay.setBackgroundColor(0xF00D1117);
+        iqomahOverlay.setVisibility(View.GONE);
+
+        LinearLayout iqomahBox = new LinearLayout(this);
+        iqomahBox.setOrientation(LinearLayout.VERTICAL);
+        iqomahBox.setGravity(Gravity.CENTER);
+        iqomahBox.setLayoutParams(new FrameLayout.LayoutParams(-1, -1, Gravity.CENTER));
+
+        iqomahLabelText = new TextView(this);
+        iqomahLabelText.setText("MENUJU IQOMAH");
+        iqomahLabelText.setTextColor(0xFFFFD700);
+        iqomahLabelText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 28);
+        iqomahLabelText.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+        iqomahLabelText.setGravity(Gravity.CENTER);
+        iqomahBox.addView(iqomahLabelText);
+
+        iqomahCountdownText = new TextView(this);
+        iqomahCountdownText.setText("05:00");
+        iqomahCountdownText.setTextColor(0xFFFFFFFF);
+        iqomahCountdownText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 120);
+        iqomahCountdownText.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
+        iqomahCountdownText.setGravity(Gravity.CENTER);
+        iqomahBox.addView(iqomahCountdownText);
+
+        TextView iqomahSub = new TextView(this);
+        iqomahSub.setText("Persiapkan diri untuk menunaikan sholat berjamaah\nPerbanyak doa di antara adzan dan iqomah");
+        iqomahSub.setTextColor(0xFF7EE787);
+        iqomahSub.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
+        iqomahSub.setGravity(Gravity.CENTER);
+        iqomahSub.setLineSpacing(dp(4), 1.2f);
+        iqomahBox.addView(iqomahSub);
+
+        iqomahOverlay.addView(iqomahBox);
+        rootLayout.addView(iqomahOverlay);
+
+        // ==========================================
+        // 6. GREEN SCREEN OVERLAY (SAAT SHOLAT / RAPATKAN SHAF)
+        // ==========================================
+        greenScreenOverlay = new FrameLayout(this);
+        greenScreenOverlay.setLayoutParams(new FrameLayout.LayoutParams(-1, -1));
+        greenScreenOverlay.setBackgroundColor(0xFF0F5132); // Deep Mosque Green
+        greenScreenOverlay.setVisibility(View.GONE);
+
+        LinearLayout greenBox = new LinearLayout(this);
+        greenBox.setOrientation(LinearLayout.VERTICAL);
+        greenBox.setGravity(Gravity.CENTER);
+        greenBox.setLayoutParams(new FrameLayout.LayoutParams(-1, -1, Gravity.CENTER));
+        greenBox.setPadding(dp(48), dp(36), dp(48), dp(36));
+
+        TextView iconShaf = new TextView(this);
+        iconShaf.setText("🕌");
+        iconShaf.setTextSize(TypedValue.COMPLEX_UNIT_SP, 72);
+        iconShaf.setGravity(Gravity.CENTER);
+        greenBox.addView(iconShaf);
+
+        greenScreenText = new TextView(this);
+        greenScreenText.setText("LURUS & RAPATKAN SHAF");
+        greenScreenText.setTextColor(0xFFFFFFFF);
+        greenScreenText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 46);
+        greenScreenText.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+        greenScreenText.setGravity(Gravity.CENTER);
+        greenScreenText.setPadding(0, dp(14), 0, dp(8));
+        greenBox.addView(greenScreenText);
+
+        TextView sholatSub = new TextView(this);
+        sholatSub.setText("“Luruskan shaf-shaf kalian, karena sesungguhnya kelurusan shaf adalah bagian dari kesempurnaan sholat.”\n(HR. Bukhari & Muslim)\n\n🔇 Harap Matikan / Senyapkan Nada Dering HP");
+        sholatSub.setTextColor(0xFFFFD700);
+        sholatSub.setTextSize(TypedValue.COMPLEX_UNIT_SP, 20);
+        sholatSub.setGravity(Gravity.CENTER);
+        sholatSub.setLineSpacing(dp(6), 1.25f);
+        greenBox.addView(sholatSub);
+
+        greenScreenOverlay.addView(greenBox);
+        rootLayout.addView(greenScreenOverlay);
+
         setContentView(rootLayout);
         rotateQuranVerse();
     }
@@ -699,6 +793,59 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
         }
 
         PrayerEngine.Slot nextSlot = slots.get(highlightedSlotIndex);
+
+        // 1. CEK FASE LAYAR HIJAU SHOLAT
+        long nowEpoch = System.currentTimeMillis();
+        if (greenScreenEndTimestamp > 0) {
+            long remainingGreenSec = (greenScreenEndTimestamp - nowEpoch) / 1000;
+            if (remainingGreenSec > 0) {
+                if (greenScreenOverlay.getVisibility() != View.VISIBLE) {
+                    greenScreenOverlay.setVisibility(View.VISIBLE);
+                }
+                return;
+            } else {
+                greenScreenEndTimestamp = 0;
+                greenScreenOverlay.setVisibility(View.GONE);
+                isAdzanApproaching = false;
+                scheduleNextSlide();
+            }
+        }
+
+        // 2. CEK FASE HITUNG MUNDUR IQOMAH
+        if (isIqomahPhaseActive && iqomahTargetTimestamp > 0) {
+            long diffIqomahSec = (iqomahTargetTimestamp - nowEpoch) / 1000;
+            if (diffIqomahSec > 0) {
+                if (iqomahOverlay.getVisibility() != View.VISIBLE) {
+                    iqomahOverlay.setVisibility(View.VISIBLE);
+                }
+                int m = (int) (diffIqomahSec / 60);
+                int s = (int) (diffIqomahSec % 60);
+                iqomahLabelText.setText("MENUJU IQOMAH " + currentPrayerNameForIqomah.toUpperCase());
+                iqomahCountdownText.setText(String.format(Locale.getDefault(), "%02d:%02d", m, s));
+
+                if (diffIqomahSec <= 10 && diffIqomahSec != lastPlayedPipSecond) {
+                    lastPlayedPipSecond = (int) diffIqomahSec;
+                    alertManager.playCountdownPip((int) diffIqomahSec);
+                }
+                return;
+            } else {
+                isIqomahPhaseActive = false;
+                iqomahOverlay.setVisibility(View.GONE);
+                alertManager.playCountdownPip(0);
+
+                int greenDuration = alertManager.getGreenScreenDurationSec();
+                if (greenDuration > 0) {
+                    greenScreenEndTimestamp = nowEpoch + (greenDuration * 1000L);
+                    greenScreenOverlay.setVisibility(View.VISIBLE);
+                    greenScreenText.setText("WAKTU SHOLAT " + currentPrayerNameForIqomah.toUpperCase() + "\nLURUS & RAPATKAN SHAF");
+                } else {
+                    isAdzanApproaching = false;
+                    scheduleNextSlide();
+                }
+                return;
+            }
+        }
+
         if (nextDiffSec > 0 && nextDiffSec <= 300 && alertManager.isCountdownEnabled()) {
             isAdzanApproaching = true;
             if (customSlideView != null && prayerSlideView.getVisibility() != View.VISIBLE) {
@@ -718,7 +865,7 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
             }
         } else {
             countdownBanner.setVisibility(View.GONE);
-            if (isAdzanApproaching && nextDiffSec > 300) {
+            if (isAdzanApproaching && nextDiffSec > 300 && !isIqomahPhaseActive && greenScreenEndTimestamp == 0) {
                 isAdzanApproaching = false;
                 scheduleNextSlide();
             }
@@ -735,6 +882,22 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
         countdownBanner.setText("🔔 Telah Masuk Waktu Sholat " + prayerName + "!");
         alertManager.playPrayerAlert();
         Toast.makeText(this, "Waktu Sholat " + prayerName + " Tiba", Toast.LENGTH_LONG).show();
+
+        if (alertManager.isIqomahEnabled() && isFardhuPrayer(prayerName)) {
+            currentPrayerNameForIqomah = prayerName;
+            isAdzanApproaching = true;
+            isIqomahPhaseActive = true;
+            if (customSlideView != null) showSlideAt(0);
+
+            int iqomahMin = alertManager.getIqomahMinutes(prayerName);
+            iqomahTargetTimestamp = System.currentTimeMillis() + (iqomahMin * 60 * 1000L);
+        }
+    }
+
+    private boolean isFardhuPrayer(String name) {
+        if (name == null) return false;
+        String n = name.toUpperCase();
+        return n.contains("SUBUH") || n.contains("DZUHUR") || n.contains("ASHAR") || n.contains("MAGHRIB") || n.contains("ISYA");
     }
 
     private void rotateQuranVerse() {

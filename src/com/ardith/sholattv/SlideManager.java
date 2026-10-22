@@ -168,12 +168,23 @@ public final class SlideManager {
         s6.youtubeUrl = "https://www.youtube.com/watch?v=live_stream";
         s6.isLocked = true;
 
+        // Slide 7: Template Multi-Panel Dashboard Kiosk (DEFAULT NON-AKTIF, SIAP DIAKTIFKAN)
+        SlideModel s7 = new SlideModel("slide_multi_panel", SlideModel.TYPE_MULTI_PANEL, "Dashboard Multi-Panel Terpadu", false, 60);
+        s7.multiPanelPreset = "SPLIT_60_40";
+        s7.slotLeftType = "LIVE_STREAM";
+        s7.slotLeftUrl = "rtsp://admin:LNUMXL@192.168.1.114:554/ch1/main";
+        s7.slotRightType = "PRAYER";
+        s7.runningText = "Lurus dan rapatkan shaf saat sholat berjamaah. Matikan suara nada dering handphone selama berada di dalam masjid.";
+        s7.runningTextSpeed = 2;
+        s7.runningTextBg = "GREEN";
+
         slides.add(s1);
         slides.add(s2);
         slides.add(s3);
         slides.add(s4);
         slides.add(s5);
         slides.add(s6);
+        slides.add(s7);
     }
 
     public synchronized void persist() {

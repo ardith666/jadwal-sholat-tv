@@ -110,6 +110,44 @@
           </div>
 
           <div class="card">
+            <h3>⏳ Jeda Waktu Menunggu Iqomah & Layar Hijau Sholat</h3>
+            <div class="form-group">
+              <label><input type="checkbox" id="chkIqomahEnabled" checked> <b>Aktifkan Fase Menunggu Iqomah</b> (Countdown angka besar di layar jadwal sholat)</label>
+            </div>
+            <div class="form-row">
+              <div class="form-group col">
+                <label for="iqomahSubuh">Subuh (Menit)</label>
+                <input type="number" id="iqomahSubuh" class="form-control" min="1" max="30" value="10">
+              </div>
+              <div class="form-group col">
+                <label for="iqomahDzuhur">Dzuhur (Menit)</label>
+                <input type="number" id="iqomahDzuhur" class="form-control" min="1" max="30" value="5">
+              </div>
+              <div class="form-group col">
+                <label for="iqomahAshar">Ashar (Menit)</label>
+                <input type="number" id="iqomahAshar" class="form-control" min="1" max="30" value="5">
+              </div>
+              <div class="form-group col">
+                <label for="iqomahMaghrib">Maghrib (Menit)</label>
+                <input type="number" id="iqomahMaghrib" class="form-control" min="1" max="30" value="7">
+              </div>
+              <div class="form-group col">
+                <label for="iqomahIsya">Isya (Menit)</label>
+                <input type="number" id="iqomahIsya" class="form-control" min="1" max="30" value="5">
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="greenScreenDuration">Durasi Layar Hijau Saat Sholat Dimulai ("Lurus & Rapatkan Shaf")</label>
+              <select id="greenScreenDuration" class="form-control">
+                <option value="30">30 Detik (Persiapan Cepat)</option>
+                <option value="60" selected>60 Detik (1 Menit)</option>
+                <option value="120">120 Detik (2 Menit)</option>
+                <option value="900">15 Menit (Sepanjang Pelaksanaan Sholat Berjamaah)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="card">
             <h3>📖 Tampilan Ayat Al-Qur'an</h3>
             <div class="checkbox-group horizontal">
               <label><input type="checkbox" id="chkShowArab"> Teks Arab Utsmani</label>
@@ -157,6 +195,7 @@
               <label for="slideType">Tipe Slide</label>
               <select id="slideType" class="form-control">
                 <option value="PRAYER">Jadwal Sholat & Al-Qur'an (Inti)</option>
+                <option value="MULTI_PANEL">Dashboard Multi-Panel Terpadu (Split Screen)</option>
                 <option value="KAS">Laporan Kas & Keuangan Masjid</option>
                 <option value="ANNOUNCEMENT">Agenda & Pengumuman (Hero + Daftar 6)</option>
                 <option value="LIVE_STREAM">Live Streaming Kajian / Khotbah (RTSP Single)</option>
@@ -248,6 +287,67 @@
             </div>
             <div class="checkbox-group">
               <label><input type="checkbox" id="chkLockYoutube" checked> 🔒 <b>Kunci Layar TV Selama Video Berjalan</b> (Tekan tombol Back di remote untuk keluar)</label>
+            </div>
+          </div>
+
+          <!-- DYNAMIC FIELDS: MULTI-PANEL -->
+          <div id="fieldsMultiPanel" class="dynamic-section hidden">
+            <h4>🎛 Konfigurasi Dashboard Multi-Panel</h4>
+            <div class="form-group">
+              <label for="panelPreset">Model Preset Layout</label>
+              <select id="panelPreset" class="form-control">
+                <option value="SPLIT_60_40">Split Kiri-Kanan (60% Kiri : 40% Kanan)</option>
+                <option value="THREE_COLUMNS">3 Kolom Sejajar (38% : 31% : 31%)</option>
+                <option value="TOP_BOTTOM">Atas-Bawah (65% Video Atas : 35% Jadwal Bawah)</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <div class="form-group col">
+                <label for="slotLeftType">Konten Panel Kiri / Atas</label>
+                <select id="slotLeftType" class="form-control">
+                  <option value="LIVE_STREAM">Live Stream RTSP</option>
+                  <option value="YOUTUBE">YouTube Live / Video</option>
+                  <option value="CCTV">CCTV Grid</option>
+                  <option value="KAS">Laporan Kas</option>
+                  <option value="AGENDA">Agenda Kajian</option>
+                </select>
+              </div>
+              <div class="form-group col">
+                <label for="slotLeftUrl">URL Stream / Video (Opsional)</label>
+                <input type="text" id="slotLeftUrl" class="form-control" placeholder="rtsp://... atau link YouTube">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group col">
+                <label for="slotRightType">Konten Panel Kanan / Bawah</label>
+                <select id="slotRightType" class="form-control">
+                  <option value="PRAYER" selected>Jadwal Sholat Mini & Jam</option>
+                  <option value="AGENDA">Agenda Kajian</option>
+                  <option value="KAS">Laporan Kas</option>
+                </select>
+              </div>
+              <div class="form-group col" id="slotThirdContainer">
+                <label for="slotThirdType">Konten Panel Ketiga (Jika 3 Kolom)</label>
+                <select id="slotThirdType" class="form-control">
+                  <option value="KAS">Laporan Kas</option>
+                  <option value="AGENDA">Agenda Kajian</option>
+                  <option value="PRAYER">Jadwal Sholat</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="runningTextInput">Teks Berjalan di Bawah (Running Text Marquee)</label>
+              <textarea id="runningTextInput" class="form-control" rows="2" placeholder="Lurus dan rapatkan shaf saat sholat berjamaah..."></textarea>
+            </div>
+            <div class="form-row">
+              <div class="form-group col">
+                <label for="runningTextBg">Warna Latar Teks Berjalan</label>
+                <select id="runningTextBg" class="form-control">
+                  <option value="GREEN" selected>Hijau Masjid Elegan</option>
+                  <option value="DARK">Hitam Gelap Minimal</option>
+                  <option value="GOLD">Emas Keemasan</option>
+                </select>
+              </div>
             </div>
           </div>
 

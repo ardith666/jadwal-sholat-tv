@@ -240,6 +240,13 @@ public final class WebServerManager {
             s.put("showArab", alertManager.isShowArab());
             s.put("showLatin", alertManager.isShowLatin());
             s.put("showTranslation", alertManager.isShowTranslation());
+            s.put("iqomahEnabled", alertManager.isIqomahEnabled());
+            s.put("iqomahSubuh", alertManager.getIqomahMinutes("SUBUH"));
+            s.put("iqomahDzuhur", alertManager.getIqomahMinutes("DZUHUR"));
+            s.put("iqomahAshar", alertManager.getIqomahMinutes("ASHAR"));
+            s.put("iqomahMaghrib", alertManager.getIqomahMinutes("MAGHRIB"));
+            s.put("iqomahIsya", alertManager.getIqomahMinutes("ISYA"));
+            s.put("greenScreenDuration", alertManager.getGreenScreenDurationSec());
 
             List<PrayerEngine.City> cities = prayerEngine.loadCities();
             Collections.sort(cities, (a, b) -> a.name.compareToIgnoreCase(b.name));
@@ -279,6 +286,14 @@ public final class WebServerManager {
             alertManager.setShowArab(req.optBoolean("showArab", true));
             alertManager.setShowLatin(req.optBoolean("showLatin", true));
             alertManager.setShowTranslation(req.optBoolean("showTranslation", true));
+
+            alertManager.setIqomahEnabled(req.optBoolean("iqomahEnabled", true));
+            alertManager.setIqomahMinutes("SUBUH", req.optInt("iqomahSubuh", 10));
+            alertManager.setIqomahMinutes("DZUHUR", req.optInt("iqomahDzuhur", 5));
+            alertManager.setIqomahMinutes("ASHAR", req.optInt("iqomahAshar", 5));
+            alertManager.setIqomahMinutes("MAGHRIB", req.optInt("iqomahMaghrib", 7));
+            alertManager.setIqomahMinutes("ISYA", req.optInt("iqomahIsya", 5));
+            alertManager.setGreenScreenDurationSec(req.optInt("greenScreenDuration", 60));
 
             notifySettingsUpdated();
             sendJsonResponse(out, new JSONObject().put("status", true));

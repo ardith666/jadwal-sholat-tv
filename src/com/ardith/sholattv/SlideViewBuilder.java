@@ -54,6 +54,8 @@ public final class SlideViewBuilder {
             return buildYouTubeView(ctx, model, holder);
         } else if (SlideModel.TYPE_CCTV.equals(model.type)) {
             return buildCctvGridView(ctx, model, holder);
+        } else if (SlideModel.TYPE_MULTI_PANEL.equals(model.type)) {
+            return buildMultiPanelView(ctx, model, sm, holder);
         } else if (SlideModel.TYPE_IMAGE.equals(model.type)) {
             return buildImageView(ctx, model, sm);
         }
@@ -696,6 +698,148 @@ public final class SlideViewBuilder {
 
         root.addView(iv);
         return root;
+    }
+
+    // ==========================================
+    // 6. MULTI-PANEL KIOSK DASHBOARD (FLEKSIBEL)
+    // ==========================================
+    private static View buildMultiPanelView(Context ctx, SlideModel m, SlideManager sm, StreamHolder holder) {
+        LinearLayout root = new LinearLayout(ctx);
+        root.setLayoutParams(new ViewGroup.LayoutParams(-1, -1));
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundColor(0xFF000000);
+
+        // Container Split Tengah (Panels)
+        LinearLayout centerRow = new LinearLayout(ctx);
+        centerRow.setOrientation(LinearLayout.HORIZONTAL);
+        centerRow.setLayoutParams(new LinearLayout.LayoutParams(-1, 0, 1f));
+
+        String preset = m.multiPanelPreset != null ? m.multiPanelPreset : "SPLIT_60_40";
+
+        if ("THREE_COLUMNS".equals(preset)) {
+            // Layout 3 Kolom Sejajar: 38% - 31% - 31%
+            centerRow.addView(createPanelSlot(ctx, m.slotLeftType, m.slotLeftUrl, m, sm, holder), new LinearLayout.LayoutParams(0, -1, 0.38f));
+            centerRow.addView(createPanelSlot(ctx, m.slotRightType, m.slotRightUrl, m, sm, holder), new LinearLayout.LayoutParams(0, -1, 0.31f));
+            centerRow.addView(createPanelSlot(ctx, m.slotThirdType, "", m, sm, holder), new LinearLayout.LayoutParams(0, -1, 0.31f));
+        } else if ("TOP_BOTTOM".equals(preset)) {
+            // Layout Atas-Bawah: Atas 65% Video, Bawah 35% Jadwal
+            centerRow.setOrientation(LinearLayout.VERTICAL);
+            centerRow.addView(createPanelSlot(ctx, m.slotLeftType, m.slotLeftUrl, m, sm, holder), new LinearLayout.LayoutParams(-1, 0, 0.65f));
+            centerRow.addView(createPanelSlot(ctx, m.slotRightType, m.slotRightUrl, m, sm, holder), new LinearLayout.LayoutParams(-1, 0, 0.35f));
+        } else {
+            // Default SPLIT_60_40: Kiri 60% Video/Visual, Kanan 40% Jadwal/Info
+            centerRow.addView(createPanelSlot(ctx, m.slotLeftType, m.slotLeftUrl, m, sm, holder), new LinearLayout.LayoutParams(0, -1, 0.60f));
+            centerRow.addView(createPanelSlot(ctx, m.slotRightType, m.slotRightUrl, m, sm, holder), new LinearLayout.LayoutParams(0, -1, 0.40f));
+        }
+
+        root.addView(centerRow);
+
+        // Running Text Bar di Bagian Bawah
+        if (m.runningText != null && !m.runningText.trim().isEmpty()) {
+            LinearLayout marqueeBar = new LinearLayout(ctx);
+            marqueeBar.setOrientation(LinearLayout.HORIZONTAL);
+            marqueeBar.setGravity(Gravity.CENTER_VERTICAL);
+            marqueeBar.setPadding(dp(ctx, 16), dp(ctx, 6), dp(ctx, 16), dp(ctx, 6));
+
+            int bgCol = 0xFF161B22;
+            if ("GREEN".equalsIgnoreCase(m.runningTextBg)) bgCol = 0xFF144620;
+            else if ("GOLD".equalsIgnoreCase(m.runningTextBg)) bgCol = 0xFF4D3800;
+            marqueeBar.setBackgroundColor(bgCol);
+
+            TextView tag = new TextView(ctx);
+            tag.setText("📢 INFO: ");
+            tag.setTextColor(0xFFFFD700);
+            tag.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+            tag.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+            marqueeBar.addView(tag);
+
+            TextView marquee = new TextView(ctx);
+            marquee.setText(m.runningText);
+            marquee.setTextColor(0xFFFFFFFF);
+            marquee.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+            marquee.setSingleLine(true);
+            marquee.setEllipsize(android.text.TextUtils.TruncateAt.MARQUEE);
+            marquee.setMarqueeRepeatLimit(-1);
+            marquee.setSelected(true);
+            marqueeBar.addView(marquee, new LinearLayout.LayoutParams(0, -2, 1f));
+
+            root.addView(marqueeBar, new LinearLayout.LayoutParams(-1, dp(ctx, 36)));
+        }
+
+        return root;
+    }
+
+    private static View createPanelSlot(Context ctx, String type, String url, SlideModel m, SlideManager sm, StreamHolder holder) {
+        FrameLayout slot = new FrameLayout(ctx);
+        slot.setBackgroundColor(0xFF0D1117);
+
+        if ("LIVE_STREAM".equalsIgnoreCase(type)) {
+            SlideModel dummy = new SlideModel("slot_live", SlideModel.TYPE_LIVE_STREAM, "Live", false, 60);
+            dummy.liveRtspUrl = url != null && !url.isEmpty() ? url : m.liveRtspUrl;
+            dummy.audioEnabled = false;
+            slot.addView(buildLiveStreamView(ctx, dummy, holder));
+        } else if ("YOUTUBE".equalsIgnoreCase(type)) {
+            SlideModel dummy = new SlideModel("slot_yt", SlideModel.TYPE_YOUTUBE, "YouTube", false, 60);
+            dummy.youtubeUrl = url != null && !url.isEmpty() ? url : m.youtubeUrl;
+            slot.addView(buildYouTubeView(ctx, dummy, holder));
+        } else if ("CCTV".equalsIgnoreCase(type)) {
+            slot.addView(buildCctvGridView(ctx, m, holder));
+        } else if ("KAS".equalsIgnoreCase(type)) {
+            slot.addView(buildKasView(ctx, m));
+        } else if ("AGENDA".equalsIgnoreCase(type)) {
+            slot.addView(buildAgendaHeroView(ctx, m));
+        } else {
+            // Default "PRAYER" (Jadwal Sholat Mini)
+            slot.addView(buildMiniPrayerView(ctx));
+        }
+
+        return slot;
+    }
+
+    private static View buildMiniPrayerView(Context ctx) {
+        LinearLayout col = new LinearLayout(ctx);
+        col.setOrientation(LinearLayout.VERTICAL);
+        col.setGravity(Gravity.CENTER);
+        col.setPadding(dp(ctx, 16), dp(ctx, 16), dp(ctx, 16), dp(ctx, 16));
+
+        PrayerEngine pe = new PrayerEngine(ctx);
+        PrayerEngine.DaySchedule ds = pe.getTodaySchedule();
+
+        TextView title = new TextView(ctx);
+        title.setText("🕌 " + ds.cityName);
+        title.setTextColor(0xFFFFD700);
+        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
+        title.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+        title.setGravity(Gravity.CENTER);
+        col.addView(title);
+
+        LinearLayout list = new LinearLayout(ctx);
+        list.setOrientation(LinearLayout.VERTICAL);
+        list.setPadding(0, dp(ctx, 12), 0, 0);
+
+        for (PrayerEngine.Slot s : ds.slots) {
+            LinearLayout row = new LinearLayout(ctx);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setPadding(dp(ctx, 12), dp(ctx, 4), dp(ctx, 12), dp(ctx, 4));
+
+            TextView n = new TextView(ctx);
+            n.setText(s.name);
+            n.setTextColor(0xB3FFFFFF);
+            n.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+            row.addView(n, new LinearLayout.LayoutParams(0, -2, 1f));
+
+            TextView t = new TextView(ctx);
+            t.setText(s.time);
+            t.setTextColor(0xFFFFFFFF);
+            t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+            t.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+            row.addView(t);
+
+            list.addView(row);
+        }
+
+        col.addView(list, new LinearLayout.LayoutParams(-1, -2));
+        return col;
     }
 
     private static int dp(Context ctx, int v) {

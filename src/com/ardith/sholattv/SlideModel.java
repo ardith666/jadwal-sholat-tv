@@ -14,6 +14,7 @@ public class SlideModel {
     public static final String TYPE_CCTV = "CCTV";
     public static final String TYPE_LIVE_STREAM = "LIVE_STREAM";
     public static final String TYPE_YOUTUBE = "YOUTUBE";
+    public static final String TYPE_MULTI_PANEL = "MULTI_PANEL";
 
     public static class AgendaItem {
         public String title;
@@ -103,6 +104,17 @@ public class SlideModel {
     public List<CctvStream> cctvStreams = new ArrayList<>();
     public String youtubeUrl; // Link video atau live stream YouTube
 
+    // Data Multi-Panel Kiosk Fleksibel
+    public String multiPanelPreset = "SPLIT_60_40"; // SPLIT_60_40, THREE_COLUMNS, TOP_BOTTOM
+    public String slotLeftType = "LIVE_STREAM";    // LIVE_STREAM, YOUTUBE, CCTV, IMAGE, KAS, PRAYER
+    public String slotLeftUrl = "";
+    public String slotRightType = "PRAYER";         // PRAYER, AGENDA, KAS, IMAGE, YOUTUBE
+    public String slotRightUrl = "";
+    public String slotThirdType = "KAS";            // KAS, AGENDA, PRAYER
+    public String runningText = "Selamat Datang di Masjid Kami. Lurus dan rapatkan shaf saat sholat berjamaah.";
+    public int runningTextSpeed = 2; // 1 = Lambat, 2 = Sedang, 3 = Cepat
+    public String runningTextBg = "DARK"; // DARK, GREEN, GOLD
+
     public SlideModel(String id, String type, String title, boolean enabled, int durationSec) {
         this.id = id;
         this.type = type;
@@ -150,6 +162,17 @@ public class SlideModel {
                 }
             }
             o.put("cctvStreams", cArr);
+
+            // Multi-Panel
+            o.put("multiPanelPreset", multiPanelPreset != null ? multiPanelPreset : "SPLIT_60_40");
+            o.put("slotLeftType", slotLeftType != null ? slotLeftType : "LIVE_STREAM");
+            o.put("slotLeftUrl", slotLeftUrl != null ? slotLeftUrl : "");
+            o.put("slotRightType", slotRightType != null ? slotRightType : "PRAYER");
+            o.put("slotRightUrl", slotRightUrl != null ? slotRightUrl : "");
+            o.put("slotThirdType", slotThirdType != null ? slotThirdType : "KAS");
+            o.put("runningText", runningText != null ? runningText : "");
+            o.put("runningTextSpeed", runningTextSpeed);
+            o.put("runningTextBg", runningTextBg != null ? runningTextBg : "DARK");
         } catch (Exception ignored) {}
         return o;
     }
@@ -203,6 +226,17 @@ public class SlideModel {
                 if (stream != null) m.cctvStreams.add(stream);
             }
         }
+
+        // Multi-Panel
+        m.multiPanelPreset = o.optString("multiPanelPreset", "SPLIT_60_40");
+        m.slotLeftType = o.optString("slotLeftType", "LIVE_STREAM");
+        m.slotLeftUrl = o.optString("slotLeftUrl", "");
+        m.slotRightType = o.optString("slotRightType", "PRAYER");
+        m.slotRightUrl = o.optString("slotRightUrl", "");
+        m.slotThirdType = o.optString("slotThirdType", "KAS");
+        m.runningText = o.optString("runningText", "Selamat Datang di Masjid Kami. Lurus dan rapatkan shaf saat sholat berjamaah.");
+        m.runningTextSpeed = o.optInt("runningTextSpeed", 2);
+        m.runningTextBg = o.optString("runningTextBg", "DARK");
 
         return m;
     }

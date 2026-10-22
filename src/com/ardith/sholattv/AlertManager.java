@@ -27,6 +27,17 @@ public final class AlertManager {
     public static final String KEY_CUSTOM_BG_URI = "custom_bg_uri";
     public static final String KEY_AUTO_UPDATE_CHECK = "auto_update_check";
 
+    // Jeda Waktu Menunggu Iqomah & Layar Hijau Sholat
+    public static final String KEY_IQOMAH_ENABLED = "iqomah_enabled";
+    public static final String KEY_IQOMAH_MINUTES_DEFAULT = "iqomah_min_default";
+    public static final String KEY_IQOMAH_MIN_SUBUH = "iqomah_min_subuh";
+    public static final String KEY_IQOMAH_MIN_DZUHUR = "iqomah_min_dzuhur";
+    public static final String KEY_IQOMAH_MIN_ASHAR = "iqomah_min_ashar";
+    public static final String KEY_IQOMAH_MIN_MAGHRIB = "iqomah_min_maghrib";
+    public static final String KEY_IQOMAH_MIN_ISYA = "iqomah_min_isya";
+
+    public static final String KEY_GREEN_SCREEN_DURATION = "green_screen_duration"; // Detik (default 60s)
+
     private final Context ctx;
     private MediaPlayer mediaPlayer;
     private MediaPlayer pipPlayer;
@@ -114,6 +125,58 @@ public final class AlertManager {
     public void setAutoUpdateCheckEnabled(boolean enabled) {
         ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                 .edit().putBoolean(KEY_AUTO_UPDATE_CHECK, enabled).apply();
+    }
+
+    public boolean isIqomahEnabled() {
+        return ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .getBoolean(KEY_IQOMAH_ENABLED, true);
+    }
+
+    public void setIqomahEnabled(boolean enabled) {
+        ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit().putBoolean(KEY_IQOMAH_ENABLED, enabled).apply();
+    }
+
+    public int getIqomahMinutes(String prayerName) {
+        SharedPreferences sp = ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        int def = sp.getInt(KEY_IQOMAH_MINUTES_DEFAULT, 5);
+        if (prayerName == null) return def;
+
+        switch (prayerName.toUpperCase()) {
+            case "SUBUH": return sp.getInt(KEY_IQOMAH_MIN_SUBUH, 10);
+            case "DZUHUR": return sp.getInt(KEY_IQOMAH_MIN_DZUHUR, def);
+            case "ASHAR": return sp.getInt(KEY_IQOMAH_MIN_ASHAR, def);
+            case "MAGHRIB": return sp.getInt(KEY_IQOMAH_MIN_MAGHRIB, 7);
+            case "ISYA": return sp.getInt(KEY_IQOMAH_MIN_ISYA, def);
+            default: return def;
+        }
+    }
+
+    public void setIqomahMinutes(String prayerName, int minutes) {
+        SharedPreferences.Editor ed = ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit();
+        if (prayerName == null) {
+            ed.putInt(KEY_IQOMAH_MINUTES_DEFAULT, minutes);
+        } else {
+            switch (prayerName.toUpperCase()) {
+                case "SUBUH": ed.putInt(KEY_IQOMAH_MIN_SUBUH, minutes); break;
+                case "DZUHUR": ed.putInt(KEY_IQOMAH_MIN_DZUHUR, minutes); break;
+                case "ASHAR": ed.putInt(KEY_IQOMAH_MIN_ASHAR, minutes); break;
+                case "MAGHRIB": ed.putInt(KEY_IQOMAH_MIN_MAGHRIB, minutes); break;
+                case "ISYA": ed.putInt(KEY_IQOMAH_MIN_ISYA, minutes); break;
+                default: ed.putInt(KEY_IQOMAH_MINUTES_DEFAULT, minutes); break;
+            }
+        }
+        ed.apply();
+    }
+
+    public int getGreenScreenDurationSec() {
+        return ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .getInt(KEY_GREEN_SCREEN_DURATION, 60);
+    }
+
+    public void setGreenScreenDurationSec(int seconds) {
+        ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit().putInt(KEY_GREEN_SCREEN_DURATION, seconds).apply();
     }
 
     public String getTheme() {
