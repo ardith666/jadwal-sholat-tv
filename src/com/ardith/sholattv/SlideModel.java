@@ -110,7 +110,9 @@ public class SlideModel {
     public String slotLeftUrl = "";
     public String slotRightType = "PRAYER";         // PRAYER, AGENDA, KAS, IMAGE, YOUTUBE
     public String slotRightUrl = "";
-    public String slotThirdType = "KAS";            // KAS, AGENDA, PRAYER
+    public String slotThirdType = "KAS";            // KAS, AGENDA, PRAYER, CCTV
+    // Mode widget Agenda di panel multi-panel: 0 = Agenda Terdekat (sorotan), 1 = Daftar Semua Agenda
+    public int panelAgendaMode = 0;
     public String runningText = "Selamat Datang di Masjid Kami. Lurus dan rapatkan shaf saat sholat berjamaah.";
     public int runningTextSpeed = 2; // 1 = Lambat, 2 = Sedang, 3 = Cepat
     public String runningTextBg = "DARK"; // DARK, GREEN, GOLD
@@ -170,6 +172,7 @@ public class SlideModel {
             o.put("slotRightType", slotRightType != null ? slotRightType : "PRAYER");
             o.put("slotRightUrl", slotRightUrl != null ? slotRightUrl : "");
             o.put("slotThirdType", slotThirdType != null ? slotThirdType : "KAS");
+            o.put("panelAgendaMode", panelAgendaMode);
             o.put("runningText", runningText != null ? runningText : "");
             o.put("runningTextSpeed", runningTextSpeed);
             o.put("runningTextBg", runningTextBg != null ? runningTextBg : "DARK");
@@ -234,6 +237,7 @@ public class SlideModel {
         m.slotRightType = o.optString("slotRightType", "PRAYER");
         m.slotRightUrl = o.optString("slotRightUrl", "");
         m.slotThirdType = o.optString("slotThirdType", "KAS");
+        m.panelAgendaMode = o.optInt("panelAgendaMode", 0);
         m.runningText = o.optString("runningText", "Selamat Datang di Masjid Kami. Lurus dan rapatkan shaf saat sholat berjamaah.");
         m.runningTextSpeed = o.optInt("runningTextSpeed", 2);
         m.runningTextBg = o.optString("runningTextBg", "DARK");

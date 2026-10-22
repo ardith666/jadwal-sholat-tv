@@ -27,6 +27,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.List;
 import java.util.Locale;
 
@@ -41,19 +42,19 @@ public final class SlideViewBuilder {
 
     public static View buildSlideView(Context ctx, SlideModel model, SlideManager sm, StreamHolder holder) {
         if (SlideModel.TYPE_KAS.equals(model.type)) {
-            return buildKasView(ctx, model);
+            return buildKasView(ctx, model, false);
         } else if (SlideModel.TYPE_ANNOUNCEMENT.equals(model.type)) {
             if (model.agendaDisplayMode == 1) {
                 return buildAgendaGridView(ctx, model);
             } else {
-                return buildAgendaHeroView(ctx, model);
+                return buildAgendaHeroView(ctx, model, false);
             }
         } else if (SlideModel.TYPE_LIVE_STREAM.equals(model.type)) {
             return buildLiveStreamView(ctx, model, holder);
         } else if (SlideModel.TYPE_YOUTUBE.equals(model.type)) {
             return buildYouTubeView(ctx, model, holder);
         } else if (SlideModel.TYPE_CCTV.equals(model.type)) {
-            return buildCctvGridView(ctx, model, holder);
+            return buildCctvGridView(ctx, model, holder, false);
         } else if (SlideModel.TYPE_MULTI_PANEL.equals(model.type)) {
             return buildMultiPanelView(ctx, model, sm, holder);
         } else if (SlideModel.TYPE_IMAGE.equals(model.type)) {
@@ -64,55 +65,81 @@ public final class SlideViewBuilder {
 
     // ==========================================
     // 1. KAS MASJID
+    // compact = true -> tampilan ringkas untuk slot panel multi-panel (2x2 card kecil)
     // ==========================================
-    private static View buildKasView(Context ctx, SlideModel m) {
+    private static View buildKasView(Context ctx, SlideModel m, boolean compact) {
         LinearLayout root = new LinearLayout(ctx);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setGravity(Gravity.CENTER);
-        root.setPadding(dp(ctx, 48), dp(ctx, 32), dp(ctx, 48), dp(ctx, 36));
+        root.setPadding(dp(ctx, compact ? 12 : 48), dp(ctx, compact ? 8 : 32),
+                dp(ctx, compact ? 12 : 48), dp(ctx, compact ? 10 : 36));
 
         TextView title = new TextView(ctx);
         title.setText("💰 " + m.title);
         title.setTextColor(0xFFFFD700);
-        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 26);
+        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, compact ? 14 : 26);
         title.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
         title.setGravity(Gravity.CENTER);
+        title.setMaxLines(1);
         root.addView(title);
-
-        LinearLayout row = new LinearLayout(ctx);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setGravity(Gravity.CENTER);
-        row.setPadding(0, dp(ctx, 32), 0, dp(ctx, 24));
 
         long saldoAkhir = m.saldoAwal + m.pemasukan - m.pengeluaran;
 
-        row.addView(createKasBox(ctx, "Saldo Awal", m.saldoAwal, 0x33FFFFFF, 0xE6FFFFFF));
-        row.addView(createKasBox(ctx, "Penerimaan Infaq (+)", m.pemasukan, 0x4D2EA043, 0xFF7EE787));
-        row.addView(createKasBox(ctx, "Pengeluaran (-)", m.pengeluaran, 0x4DF85149, 0xFFFF7B72));
-        row.addView(createKasBox(ctx, "Saldo Akhir Kas", saldoAkhir, 0x661F6FEB, 0xFFFFD700));
+        if (compact) {
+            // Susun 4 kartu info dalam grid 2x2 agar hemat ruang di panel sempit
+            LinearLayout grid = new LinearLayout(ctx);
+            grid.setOrientation(LinearLayout.VERTICAL);
+            grid.setPadding(0, dp(ctx, 8), 0, dp(ctx, 4));
 
-        root.addView(row, new LinearLayout.LayoutParams(-1, -2));
+            LinearLayout rowTop = new LinearLayout(ctx);
+            rowTop.setOrientation(LinearLayout.HORIZONTAL);
+            rowTop.addView(createKasBox(ctx, "Saldo Awal", m.saldoAwal, 0x33FFFFFF, 0xE6FFFFFF, true));
+            rowTop.addView(createKasBox(ctx, "Infaq (+)", m.pemasukan, 0x4D2EA043, 0xFF7EE787, true));
+            grid.addView(rowTop);
+
+            LinearLayout rowBottom = new LinearLayout(ctx);
+            rowBottom.setOrientation(LinearLayout.HORIZONTAL);
+            rowBottom.addView(createKasBox(ctx, "Pengeluaran (-)", m.pengeluaran, 0x4DF85149, 0xFFFF7B72, true));
+            rowBottom.addView(createKasBox(ctx, "Saldo Akhir", saldoAkhir, 0x661F6FEB, 0xFFFFD700, true));
+            grid.addView(rowBottom);
+
+            root.addView(grid, new LinearLayout.LayoutParams(-1, 0, 1f));
+        } else {
+            LinearLayout row = new LinearLayout(ctx);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.CENTER);
+            row.setPadding(0, dp(ctx, 32), 0, dp(ctx, 24));
+
+            row.addView(createKasBox(ctx, "Saldo Awal", m.saldoAwal, 0x33FFFFFF, 0xE6FFFFFF, false));
+            row.addView(createKasBox(ctx, "Penerimaan Infaq (+)", m.pemasukan, 0x4D2EA043, 0xFF7EE787, false));
+            row.addView(createKasBox(ctx, "Pengeluaran (-)", m.pengeluaran, 0x4DF85149, 0xFFFF7B72, false));
+            row.addView(createKasBox(ctx, "Saldo Akhir Kas", saldoAkhir, 0x661F6FEB, 0xFFFFD700, false));
+
+            root.addView(row, new LinearLayout.LayoutParams(-1, -2));
+        }
 
         if (m.catatanKas != null && !m.catatanKas.isEmpty()) {
             TextView note = new TextView(ctx);
             note.setText("Keterangan: " + m.catatanKas);
             note.setTextColor(0xB3FFFFFF);
-            note.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
+            note.setTextSize(TypedValue.COMPLEX_UNIT_SP, compact ? 10 : 15);
             note.setGravity(Gravity.CENTER);
+            note.setMaxLines(2);
             root.addView(note);
         }
 
         return root;
     }
 
-    private static View createKasBox(Context ctx, String label, long amount, int bgColor, int textColor) {
+    private static View createKasBox(Context ctx, String label, long amount, int bgColor, int textColor, boolean compact) {
         LinearLayout b = new LinearLayout(ctx);
         b.setOrientation(LinearLayout.VERTICAL);
         b.setGravity(Gravity.CENTER);
-        b.setPadding(dp(ctx, 16), dp(ctx, 16), dp(ctx, 16), dp(ctx, 18));
+        b.setPadding(dp(ctx, compact ? 8 : 16), dp(ctx, compact ? 6 : 16),
+                dp(ctx, compact ? 8 : 16), dp(ctx, compact ? 7 : 18));
 
         GradientDrawable bg = new GradientDrawable();
-        bg.setCornerRadius(dp(ctx, 14));
+        bg.setCornerRadius(dp(ctx, compact ? 8 : 14));
         bg.setColor(bgColor);
         bg.setStroke(dp(ctx, 1), 0x33FFFFFF);
         b.setBackground(bg);
@@ -120,38 +147,60 @@ public final class SlideViewBuilder {
         TextView l = new TextView(ctx);
         l.setText(label);
         l.setTextColor(0xB3FFFFFF);
-        l.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+        l.setTextSize(TypedValue.COMPLEX_UNIT_SP, compact ? 9 : 13);
         l.setGravity(Gravity.CENTER);
+        l.setMaxLines(1);
         b.addView(l);
 
         TextView v = new TextView(ctx);
-        v.setText("Rp " + String.format(Locale.getDefault(), "%,d", amount).replace(',', '.'));
+        v.setText(compact ? formatRupiahCompact(amount) : "Rp " + String.format(Locale.getDefault(), "%,d", amount).replace(',', '.'));
         v.setTextColor(textColor);
-        v.setTextSize(TypedValue.COMPLEX_UNIT_SP, 20);
+        v.setTextSize(TypedValue.COMPLEX_UNIT_SP, compact ? 13 : 20);
         v.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
         v.setGravity(Gravity.CENTER);
-        v.setPadding(0, dp(ctx, 6), 0, 0);
+        v.setMaxLines(1);
+        v.setPadding(0, dp(ctx, compact ? 3 : 6), 0, 0);
         b.addView(v);
 
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, -2, 1f);
-        lp.setMargins(dp(ctx, 8), 0, dp(ctx, 8), 0);
+        lp.setMargins(dp(ctx, compact ? 4 : 8), dp(ctx, compact ? 4 : 0), dp(ctx, compact ? 4 : 8), dp(ctx, compact ? 4 : 0));
         b.setLayoutParams(lp);
         return b;
     }
 
+    /** Format rupiah ringkas untuk panel sempit: 12.500.000 -> "Rp 12,5 Jt". */
+    private static String formatRupiahCompact(long amount) {
+        long abs = Math.abs(amount);
+        if (abs >= 1_000_000_000L) {
+            return "Rp " + trimDecimal((double) amount / 1_000_000_000d) + " M";
+        }
+        if (abs >= 1_000_000L) {
+            return "Rp " + trimDecimal((double) amount / 1_000_000d) + " Jt";
+        }
+        return "Rp " + String.format(Locale.getDefault(), "%,d", amount).replace(',', '.');
+    }
+
+    private static String trimDecimal(double val) {
+        String s = String.format(Locale.getDefault(), "%.2f", val);
+        s = s.replaceAll("0+$", "").replaceAll("\\.$", "");
+        return s.replace('.', ',');
+    }
+
     // ==========================================
     // 2A. AGENDA TERDEKAT (HERO SLIDE)
+    // compact = true -> versi ringkas untuk slot panel multi-panel
     // ==========================================
-    private static View buildAgendaHeroView(Context ctx, SlideModel m) {
+    private static View buildAgendaHeroView(Context ctx, SlideModel m, boolean compact) {
         LinearLayout root = new LinearLayout(ctx);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setGravity(Gravity.CENTER);
-        root.setPadding(dp(ctx, 50), dp(ctx, 24), dp(ctx, 50), dp(ctx, 28));
+        root.setPadding(dp(ctx, compact ? 14 : 50), dp(ctx, compact ? 8 : 24),
+                dp(ctx, compact ? 14 : 50), dp(ctx, compact ? 10 : 28));
 
         TextView tag = new TextView(ctx);
         tag.setText("⭐ AGENDA TERDEKAT MASJID");
         tag.setTextColor(0xFFFFD700);
-        tag.setTextSize(TypedValue.COMPLEX_UNIT_SP, 22);
+        tag.setTextSize(TypedValue.COMPLEX_UNIT_SP, compact ? 13 : 22);
         tag.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
         tag.setGravity(Gravity.CENTER);
         root.addView(tag);
@@ -162,11 +211,12 @@ public final class SlideViewBuilder {
 
         FrameLayout card = new FrameLayout(ctx);
         GradientDrawable cardBg = new GradientDrawable();
-        cardBg.setCornerRadius(dp(ctx, 18));
+        cardBg.setCornerRadius(dp(ctx, compact ? 10 : 18));
         cardBg.setColor(0x59000000);
-        cardBg.setStroke(dp(ctx, 2), 0xFFFFD700);
+        cardBg.setStroke(dp(ctx, compact ? 1 : 2), 0xFFFFD700);
         card.setBackground(cardBg);
-        card.setPadding(dp(ctx, 36), dp(ctx, 24), dp(ctx, 36), dp(ctx, 24));
+        card.setPadding(dp(ctx, compact ? 14 : 36), dp(ctx, compact ? 10 : 24),
+                dp(ctx, compact ? 14 : 36), dp(ctx, compact ? 10 : 24));
 
         LinearLayout cardCol = new LinearLayout(ctx);
         cardCol.setOrientation(LinearLayout.VERTICAL);
@@ -175,33 +225,87 @@ public final class SlideViewBuilder {
         TextView title = new TextView(ctx);
         title.setText(first.title);
         title.setTextColor(0xFFFFFFFF);
-        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 24);
+        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, compact ? 16 : 24);
         title.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
         title.setGravity(Gravity.CENTER);
+        title.setMaxLines(compact ? 3 : 10);
         cardCol.addView(title);
 
         TextView time = new TextView(ctx);
         String sub = first.waktu + (first.narasumber != null && !first.narasumber.isEmpty() ? " | " + first.narasumber : "");
         time.setText("🗓 " + sub);
         time.setTextColor(0xFF7EE787);
-        time.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
+        time.setTextSize(TypedValue.COMPLEX_UNIT_SP, compact ? 11 : 16);
         time.setGravity(Gravity.CENTER);
-        time.setPadding(0, dp(ctx, 8), 0, dp(ctx, 14));
+        time.setMaxLines(2);
+        time.setPadding(0, dp(ctx, compact ? 4 : 8), 0, dp(ctx, compact ? 6 : 14));
         cardCol.addView(time);
 
         TextView desc = new TextView(ctx);
         desc.setText(first.desc != null ? first.desc : "");
         desc.setTextColor(0xE6E6EDF3);
-        desc.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17);
-        desc.setLineSpacing(dp(ctx, 4), 1.15f);
+        desc.setTextSize(TypedValue.COMPLEX_UNIT_SP, compact ? 11 : 17);
+        desc.setLineSpacing(dp(ctx, 2), 1.1f);
         desc.setGravity(Gravity.CENTER);
+        desc.setMaxLines(compact ? 4 : 20);
         cardCol.addView(desc);
 
         card.addView(cardCol);
         LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(-1, -2);
-        clp.setMargins(0, dp(ctx, 16), 0, 0);
+        clp.setMargins(0, dp(ctx, compact ? 6 : 16), 0, 0);
         root.addView(card, clp);
 
+        return root;
+    }
+
+    /**
+     * Widget Agenda untuk slot panel multi-panel.
+     * panelAgendaMode 0 -> sorotan agenda terdekat, 1 -> daftar seluruh agenda.
+     */
+    private static View buildAgendaPanelView(Context ctx, SlideModel m) {
+        if (m.panelAgendaMode == 1) return buildAgendaListCompactView(ctx, m);
+        return buildAgendaHeroView(ctx, m, true);
+    }
+
+    /** Daftar agenda (semua agenda terdaftar) dalam bentuk stack vertikal ringkas. */
+    private static View buildAgendaListCompactView(Context ctx, SlideModel m) {
+        LinearLayout root = new LinearLayout(ctx);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setGravity(Gravity.CENTER_HORIZONTAL);
+        root.setPadding(dp(ctx, 10), dp(ctx, 8), dp(ctx, 10), dp(ctx, 8));
+
+        TextView tag = new TextView(ctx);
+        tag.setText("🗓 DAFTAR AGENDA MASJID");
+        tag.setTextColor(0xFFFFD700);
+        tag.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+        tag.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+        tag.setGravity(Gravity.CENTER);
+        root.addView(tag);
+
+        List<SlideModel.AgendaItem> items = m.agendaList != null ? m.agendaList : new ArrayList<>();
+        if (items.isEmpty()) {
+            TextView empty = new TextView(ctx);
+            empty.setText("Belum ada agenda terdaftar.");
+            empty.setTextColor(0xB3FFFFFF);
+            empty.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+            empty.setGravity(Gravity.CENTER);
+            root.addView(empty);
+            return root;
+        }
+
+        LinearLayout list = new LinearLayout(ctx);
+        list.setOrientation(LinearLayout.VERTICAL);
+        list.setPadding(0, dp(ctx, 6), 0, 0);
+
+        int n = Math.min(items.size(), 6);
+        for (int i = 0; i < n; i++) {
+            View card = createAgendaGridCard(ctx, items.get(i));
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, 0, 1f);
+            lp.setMargins(dp(ctx, 3), dp(ctx, 3), dp(ctx, 3), dp(ctx, 3));
+            list.addView(card, lp);
+        }
+
+        root.addView(list, new LinearLayout.LayoutParams(-1, 0, 1f));
         return root;
     }
 
@@ -553,7 +657,7 @@ public final class SlideViewBuilder {
     // ==========================================
     // 4. MULTI-STREAM CCTV (EXOPLAYER RTSP GRID)
     // ==========================================
-    private static View buildCctvGridView(Context ctx, SlideModel m, StreamHolder holder) {
+    private static View buildCctvGridView(Context ctx, SlideModel m, StreamHolder holder, boolean compact) {
         FrameLayout root = new FrameLayout(ctx);
         root.setLayoutParams(new ViewGroup.LayoutParams(-1, -1));
         root.setBackgroundColor(0xFF000000);
@@ -606,7 +710,9 @@ public final class SlideViewBuilder {
 
         root.addView(container);
 
-        // Header Title Badge
+        // Header Title Badge ( disembunyikan pada slot panel agar tidak menutupi grid)
+        if (compact) return root;
+
         TextView titleBadge = new TextView(ctx);
         titleBadge.setText("📹 CCTV PENGAWASAN MASJID (" + count + " KAMERA)");
         titleBadge.setTextColor(0xFFFFFFFF);
@@ -783,11 +889,11 @@ public final class SlideViewBuilder {
             dummy.youtubeUrl = url != null && !url.isEmpty() ? url : m.youtubeUrl;
             slot.addView(buildYouTubeView(ctx, dummy, holder));
         } else if ("CCTV".equalsIgnoreCase(type)) {
-            slot.addView(buildCctvGridView(ctx, m, holder));
+            slot.addView(buildCctvGridView(ctx, m, holder, true));
         } else if ("KAS".equalsIgnoreCase(type)) {
-            slot.addView(buildKasView(ctx, m));
+            slot.addView(buildKasView(ctx, m, true));
         } else if ("AGENDA".equalsIgnoreCase(type)) {
-            slot.addView(buildAgendaHeroView(ctx, m));
+            slot.addView(buildAgendaPanelView(ctx, m));
         } else {
             // Default "PRAYER" (Jadwal Sholat Mini)
             slot.addView(buildMiniPrayerView(ctx));
@@ -799,8 +905,8 @@ public final class SlideViewBuilder {
     private static View buildMiniPrayerView(Context ctx) {
         LinearLayout col = new LinearLayout(ctx);
         col.setOrientation(LinearLayout.VERTICAL);
-        col.setGravity(Gravity.CENTER);
-        col.setPadding(dp(ctx, 16), dp(ctx, 16), dp(ctx, 16), dp(ctx, 16));
+        col.setGravity(Gravity.CENTER_HORIZONTAL);
+        col.setPadding(dp(ctx, 12), dp(ctx, 10), dp(ctx, 12), dp(ctx, 10));
 
         PrayerEngine pe = new PrayerEngine(ctx);
         PrayerEngine.DaySchedule ds = pe.getTodaySchedule();
@@ -808,24 +914,76 @@ public final class SlideViewBuilder {
         TextView title = new TextView(ctx);
         title.setText("🕌 " + ds.cityName);
         title.setTextColor(0xFFFFD700);
-        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
+        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
         title.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
         title.setGravity(Gravity.CENTER);
+        title.setMaxLines(1);
         col.addView(title);
+
+        // ---- Kartu highlight waktu sholat berikutnya ----
+        LinearLayout nextCard = new LinearLayout(ctx);
+        nextCard.setOrientation(LinearLayout.HORIZONTAL);
+        nextCard.setGravity(Gravity.CENTER_VERTICAL);
+        nextCard.setPadding(dp(ctx, 12), dp(ctx, 6), dp(ctx, 12), dp(ctx, 6));
+
+        GradientDrawable nextBg = new GradientDrawable();
+        nextBg.setCornerRadius(dp(ctx, 10));
+        nextBg.setColor(0x4D2EA043);
+        nextBg.setStroke(dp(ctx, 1), 0xFFFFD700);
+        nextCard.setBackground(nextBg);
+
+        LinearLayout nextInfo = new LinearLayout(ctx);
+        nextInfo.setOrientation(LinearLayout.VERTICAL);
+        nextInfo.setGravity(Gravity.CENTER_VERTICAL);
+
+        TextView nextLabel = new TextView(ctx);
+        nextLabel.setText("WAKTU SHOLAT BERIKUTNYA");
+        nextLabel.setTextColor(0xB3FFFFFF);
+        nextLabel.setTextSize(TypedValue.COMPLEX_UNIT_SP, 9);
+        nextLabel.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+        nextInfo.addView(nextLabel);
+
+        TextView nextName = new TextView(ctx);
+        nextName.setText("--");
+        nextName.setTextColor(0xFFFFD700);
+        nextName.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
+        nextName.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+        nextInfo.addView(nextName);
+
+        nextCard.addView(nextInfo, new LinearLayout.LayoutParams(0, -2, 1f));
+
+        TextView nextCountdown = new TextView(ctx);
+        nextCountdown.setText("--:--:--");
+        nextCountdown.setTextColor(0xFF7EE787);
+        nextCountdown.setTextSize(TypedValue.COMPLEX_UNIT_SP, 19);
+        nextCountdown.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+        nextCountdown.setGravity(Gravity.CENTER);
+        nextCard.addView(nextCountdown);
+
+        LinearLayout.LayoutParams ncp = new LinearLayout.LayoutParams(-1, -2);
+        ncp.setMargins(0, dp(ctx, 8), 0, dp(ctx, 4));
+        col.addView(nextCard, ncp);
+
+        // ---- Daftar waktu sholat (baris berikutnya disorot) ----
+        final List<PrayerEngine.Slot> slots = ds.slots;
+        final List<LinearLayout> rows = new ArrayList<>();
+        final List<TextView> nameViews = new ArrayList<>();
+        final List<TextView> timeViews = new ArrayList<>();
 
         LinearLayout list = new LinearLayout(ctx);
         list.setOrientation(LinearLayout.VERTICAL);
-        list.setPadding(0, dp(ctx, 12), 0, 0);
 
-        for (PrayerEngine.Slot s : ds.slots) {
+        for (PrayerEngine.Slot s : slots) {
             LinearLayout row = new LinearLayout(ctx);
             row.setOrientation(LinearLayout.HORIZONTAL);
-            row.setPadding(dp(ctx, 12), dp(ctx, 4), dp(ctx, 12), dp(ctx, 4));
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setPadding(dp(ctx, 10), dp(ctx, 3), dp(ctx, 10), dp(ctx, 3));
 
             TextView n = new TextView(ctx);
             n.setText(s.name);
             n.setTextColor(0xB3FFFFFF);
             n.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+            n.setSingleLine(true);
             row.addView(n, new LinearLayout.LayoutParams(0, -2, 1f));
 
             TextView t = new TextView(ctx);
@@ -836,10 +994,94 @@ public final class SlideViewBuilder {
             row.addView(t);
 
             list.addView(row);
+            rows.add(row);
+            nameViews.add(n);
+            timeViews.add(t);
         }
 
-        col.addView(list, new LinearLayout.LayoutParams(-1, -2));
+        col.addView(list, new LinearLayout.LayoutParams(-1, 0, 1f));
+
+        // ---- Penanda waktu sholat berikutnya (dalam daftar) ----
+        final int[] highlighted = {-1};
+
+        Runnable updater = new Runnable() {
+            @Override
+            public void run() {
+                Calendar now = Calendar.getInstance();
+                int nowMin = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE);
+                int nowSec = now.get(Calendar.SECOND);
+
+                int idx = -1;
+                for (int i = 0; i < slots.size(); i++) {
+                    PrayerEngine.Slot s = slots.get(i);
+                    if (s.minutes >= nowMin && isFardhuPrayer(s.name)) {
+                        idx = i;
+                        break;
+                    }
+                }
+                boolean tomorrow = false;
+                if (idx == -1) {
+                    // Semua waktu sholat fardhu hari ini sudah lewat -> Subuh besok
+                    for (int i = 0; i < slots.size(); i++) {
+                        PrayerEngine.Slot s = slots.get(i);
+                        if (isFardhuPrayer(s.name)) {
+                            idx = i;
+                            tomorrow = true;
+                            break;
+                        }
+                    }
+                }
+                if (idx == -1) return;
+
+                int targetSec = slots.get(idx).minutes * 60;
+                int nowTotalSec = nowMin * 60 + nowSec;
+                int diffSec = targetSec - nowTotalSec;
+                if (tomorrow || diffSec < 0) diffSec += 24 * 3600;
+
+                if (idx != highlighted[0]) {
+                    highlighted[0] = idx;
+                    for (int i = 0; i < rows.size(); i++) {
+                        boolean active = (i == idx);
+                        GradientDrawable bg = new GradientDrawable();
+                        bg.setCornerRadius(dp(ctx, 8));
+                        bg.setColor(active ? 0x662EA043 : 0x00000000);
+                        bg.setStroke(dp(ctx, 1), active ? 0xFFFFD700 : 0x00FFFFFF);
+                        rows.get(i).setBackground(bg);
+                        nameViews.get(i).setTextColor(active ? 0xFFFFD700 : 0xB3FFFFFF);
+                        nameViews.get(i).setText(active ? "▶ " + slots.get(i).name : slots.get(i).name);
+                        timeViews.get(i).setTextColor(active ? 0xFFFFD700 : 0xFFFFFFFF);
+                    }
+                    nextName.setText(slots.get(idx).name.toUpperCase() + "  " + slots.get(idx).time);
+                }
+
+                nextCountdown.setText(String.format(Locale.getDefault(), "%02d:%02d:%02d",
+                        diffSec / 3600, (diffSec % 3600) / 60, diffSec % 60));
+            }
+        };
+
+        updater.run();
+        tickEverySecond(col, updater);
+
         return col;
+    }
+
+    /** Ticker 1 detik yang berhenti sendiri saat view dilepas dari layar. */
+    private static void tickEverySecond(View host, Runnable action) {
+        host.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                if (!host.isAttachedToWindow()) return;
+                action.run();
+                host.postDelayed(this, 1000);
+            }
+        }, 1000);
+    }
+
+    private static boolean isFardhuPrayer(String name) {
+        if (name == null) return false;
+        String n = name.toUpperCase();
+        return n.contains("SUBUH") || n.contains("DZUHUR") || n.contains("ASHAR")
+                || n.contains("MAGHRIB") || n.contains("ISYA");
     }
 
     private static int dp(Context ctx, int v) {

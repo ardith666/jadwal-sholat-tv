@@ -27,18 +27,29 @@ public final class PrayerEngine {
     private static final String PREFS_NAME = "sholattv_prefs";
     private static final String KEY_CITY_ID = "city_id";
     private static final String KEY_CITY_NAME = "city_name";
+    private static final String KEY_MOSQUE_NAME = "mosque_name";
     private static final String DEFAULT_CITY_ID = "1624"; // Sidoarjo
     private static final String DEFAULT_CITY_NAME = "KAB. SIDOARJO";
+    private static final String DEFAULT_MOSQUE_NAME = "";
 
     public static final class City {
         public final String id;
         public final String name;
+        public final String province;
         public City(String id, String name) {
+            this(id, name, "");
+        }
+        public City(String id, String name, String province) {
             this.id = id;
             this.name = name;
+            this.province = province == null ? "" : province;
+        }
+        public String getDisplayName() {
+            if (province == null || province.isEmpty()) return name;
+            return name + " - " + province;
         }
         @Override
-        public String toString() { return name; }
+        public String toString() { return getDisplayName(); }
     }
 
     public static final class Slot {
@@ -89,6 +100,18 @@ public final class PrayerEngine {
                 .apply();
     }
 
+    public String getMosqueName() {
+        return ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .getString(KEY_MOSQUE_NAME, DEFAULT_MOSQUE_NAME);
+    }
+
+    public void setMosqueName(String name) {
+        ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit()
+                .putString(KEY_MOSQUE_NAME, name == null ? "" : name)
+                .apply();
+    }
+
     public List<City> loadCities() {
         List<City> list = new ArrayList<>();
         try (InputStream in = ctx.getAssets().open("data/cities.json");
@@ -99,7 +122,7 @@ public final class PrayerEngine {
             JSONArray arr = new JSONArray(sb.toString());
             for (int i = 0; i < arr.length(); i++) {
                 JSONObject o = arr.getJSONObject(i);
-                list.add(new City(o.getString("id"), o.getString("lokasi")));
+                list.add(new City(o.getString("id"), o.getString("lokasi"), o.optString("daerah", "")));
             }
         } catch (Exception e) {
             Log.e(TAG, "Error loading cities", e);

@@ -7,6 +7,8 @@ document.addEventListener("DOMContentLoaded", () => {
   initTabs();
   initSlideEditor();
   initSettingsForm();
+  initCitySearch();
+  initThemeControls();
   initPinForm();
 
   if (currentPin) {
@@ -123,7 +125,10 @@ function renderSlides(slides) {
     } else if (s.type === "IMAGE") {
       detailText = `Poster Gambar: ${s.imageFileName || 'Belum ada gambar'}`;
     } else if (s.type === "MULTI_PANEL") {
-      detailText = `Preset: ${s.multiPanelPreset || 'SPLIT'} | Kiri: ${s.slotLeftType || 'LIVE'} | Kanan: ${s.slotRightType || 'PRAYER'}`;
+      const cam = (s.cctvStreams || []).length;
+      detailText = `Preset: ${s.multiPanelPreset || 'SPLIT'} | A: ${s.slotLeftType || 'LIVE'} | B: ${s.slotRightType || 'PRAYER'} | C: ${s.slotThirdType || '-'}`
+        + ` | Agenda: ${s.panelAgendaMode ? 'Daftar Semua' : 'Terdekat'}`
+        + (cam > 0 ? ` | ${cam} Kamera CCTV` : "");
     }
 
     card.setAttribute("draggable", "true");
@@ -271,6 +276,9 @@ function initSlideEditor() {
 
   slideTypeSelect.addEventListener("change", () => {
     updateDynamicSections(slideTypeSelect.value);
+    if (slideTypeSelect.value === "MULTI_PANEL") {
+      updateLiveMultiPanelPreview();
+    }
   });
 
   document.getElementById("addAgendaItemBtn").addEventListener("click", () => {
@@ -297,6 +305,8 @@ function initSlideEditor() {
   ["slotLeftUrl", "runningTextInput"].forEach(id => {
     document.getElementById(id).addEventListener("input", updateLiveMultiPanelPreview);
   });
+
+  initPuzzleDragAndDrop();
 
   document.getElementById("slideForm").addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -354,6 +364,14 @@ function initSlideEditor() {
       slide.slotThirdType = document.getElementById("slotThirdType").value;
       slide.runningText = document.getElementById("runningTextInput").value.trim();
       slide.runningTextBg = document.getElementById("runningTextBg").value;
+      slide.panelAgendaMode = parseInt(document.getElementById("panelAgendaMode").value) || 0;
+      // Widget KAS / AGENDA / CCTV di dalam panel memakai data slide yang sama
+      slide.saldoAwal = parseInt(document.getElementById("kasSaldoAwal").value) || 0;
+      slide.pemasukan = parseInt(document.getElementById("kasPemasukan").value) || 0;
+      slide.pengeluaran = parseInt(document.getElementById("kasPengeluaran").value) || 0;
+      slide.catatanKas = document.getElementById("kasCatatan").value.trim();
+      slide.agendaList = collectAgendaItems();
+      slide.cctvStreams = collectCctvStreams();
     }
 
     await saveSlidesToServer();
@@ -362,21 +380,24 @@ function initSlideEditor() {
 }
 
 function updateDynamicSections(type) {
-  document.getElementById("fieldsKas").classList.add("hidden");
-  document.getElementById("fieldsAnnouncement").classList.add("hidden");
-  document.getElementById("fieldsLiveStream").classList.add("hidden");
-  document.getElementById("fieldsCctv").classList.add("hidden");
-  document.getElementById("fieldsImage").classList.add("hidden");
-  document.getElementById("fieldsYoutube").classList.add("hidden");
-  document.getElementById("fieldsMultiPanel").classList.add("hidden");
+  ["fieldsKas", "fieldsAnnouncement", "fieldsLiveStream", "fieldsCctv",
+    "fieldsImage", "fieldsYoutube", "fieldsMultiPanel"].forEach(id => {
+    document.getElementById(id).classList.add("hidden");
+  });
 
   if (type === "KAS") document.getElementById("fieldsKas").classList.remove("hidden");
   else if (type === "ANNOUNCEMENT") document.getElementById("fieldsAnnouncement").classList.remove("hidden");
   else if (type === "LIVE_STREAM") document.getElementById("fieldsLiveStream").classList.remove("hidden");
   else if (type === "YOUTUBE") document.getElementById("fieldsYoutube").classList.remove("hidden");
   else if (type === "CCTV") document.getElementById("fieldsCctv").classList.remove("hidden");
-  else if (type === "MULTI_PANEL") document.getElementById("fieldsMultiPanel").classList.remove("hidden");
   else if (type === "IMAGE") document.getElementById("fieldsImage").classList.remove("hidden");
+  else if (type === "MULTI_PANEL") {
+    // Panel bisa memuat widget Kas, Agenda, dan CCTV -> semua section data ikut ditampilkan
+    document.getElementById("fieldsMultiPanel").classList.remove("hidden");
+    document.getElementById("fieldsKas").classList.remove("hidden");
+    document.getElementById("fieldsAnnouncement").classList.remove("hidden");
+    document.getElementById("fieldsCctv").classList.remove("hidden");
+  }
 }
 
 function editSlide(id) {
@@ -400,8 +421,8 @@ function openSlideEditor(slide) {
     document.getElementById("slideType").disabled = false;
   }
 
-  // Pre-fill Kas
-  if (slide && slide.type === "KAS") {
+  // Pre-fill Kas (slide KAS dan widget Kas di panel Multi-Panel memakai data yang sama)
+  if (slide && (slide.type === "KAS" || slide.type === "MULTI_PANEL")) {
     document.getElementById("kasSaldoAwal").value = slide.saldoAwal || 0;
     document.getElementById("kasPemasukan").value = slide.pemasukan || 0;
     document.getElementById("kasPengeluaran").value = slide.pengeluaran || 0;
@@ -440,6 +461,7 @@ function openSlideEditor(slide) {
   document.getElementById("slotLeftUrl").value = (slide && slide.slotLeftUrl) ? slide.slotLeftUrl : "";
   document.getElementById("slotRightType").value = (slide && slide.slotRightType) ? slide.slotRightType : "PRAYER";
   document.getElementById("slotThirdType").value = (slide && slide.slotThirdType) ? slide.slotThirdType : "KAS";
+  document.getElementById("panelAgendaMode").value = (slide && slide.panelAgendaMode) ? slide.panelAgendaMode : 0;
   document.getElementById("runningTextInput").value = (slide && slide.runningText) ? slide.runningText : "Lurus dan rapatkan shaf saat sholat berjamaah...";
   document.getElementById("runningTextBg").value = (slide && slide.runningTextBg) ? slide.runningTextBg : "GREEN";
 
@@ -620,6 +642,65 @@ function setSlotPreviewContent(slot, type, url) {
   }
 }
 
+// ==========================================
+// PUZZLE BLOCKS DRAG, DROP & SWAP (MULTI-PANEL)
+// ==========================================
+let puzzleDragSlot = null;
+
+function initPuzzleDragAndDrop() {
+  document.querySelectorAll(".puzzle-slot").forEach(slot => {
+    slot.addEventListener("dragstart", function(e) {
+      puzzleDragSlot = this.dataset.slot;
+      this.style.opacity = "0.5";
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", puzzleDragSlot);
+    });
+
+    slot.addEventListener("dragover", function(e) {
+      e.preventDefault();
+      this.classList.add("puzzle-dragover");
+      e.dataTransfer.dropEffect = "move";
+    });
+
+    slot.addEventListener("dragleave", function() {
+      this.classList.remove("puzzle-dragover");
+    });
+
+    slot.addEventListener("drop", function(e) {
+      e.preventDefault();
+      this.classList.remove("puzzle-dragover");
+      const targetSlot = this.dataset.slot;
+      if (puzzleDragSlot && puzzleDragSlot !== targetSlot) {
+        swapSlots(puzzleDragSlot, targetSlot);
+      }
+    });
+
+    slot.addEventListener("dragend", function() {
+      this.style.opacity = "1";
+      document.querySelectorAll(".puzzle-slot").forEach(s => s.classList.remove("puzzle-dragover"));
+    });
+  });
+}
+
+function swapSlots(slot1, slot2) {
+  // Map A -> Left, B -> Right, C -> Third
+  const idMap = {
+    "A": "slotLeftType",
+    "B": "slotRightType",
+    "C": "slotThirdType"
+  };
+
+  const elem1 = document.getElementById(idMap[slot1]);
+  const elem2 = document.getElementById(idMap[slot2]);
+
+  if (elem1 && elem2) {
+    const tempVal = elem1.value;
+    elem1.value = elem2.value;
+    elem2.value = tempVal;
+    updateLiveMultiPanelPreview();
+  }
+}
+
 function escapeHtml(str) {
   if (!str) return "";
   return str.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/'/g, "&#039;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -653,29 +734,33 @@ async function loadSettings() {
 function populateSettings(s) {
   const citySelect = document.getElementById("citySelect");
   citySelect.innerHTML = "";
-  if (s.cities) {
-    s.cities.forEach(c => {
-      const opt = document.createElement("option");
-      opt.value = c.id;
-      opt.textContent = c.name;
-      if (c.id === s.currentCityId) opt.selected = true;
-      citySelect.appendChild(opt);
-    });
-  }
+  const cities = s.cities || [];
+  cities.forEach(c => {
+    const opt = document.createElement("option");
+    opt.value = c.id;
+    opt.textContent = c.province ? (c.name + " - " + c.province) : c.name;
+    opt.dataset.name = c.name;
+    if (c.id === s.currentCityId) opt.selected = true;
+    citySelect.appendChild(opt);
+  });
+  document.getElementById("citySearch").value = "";
+  document.getElementById("citySearchHint").textContent = "Menampilkan seluruh " + cities.length + " kota/kabupaten.";
 
   const themeSelect = document.getElementById("themeSelect");
   themeSelect.innerHTML = "";
-  if (s.themes) {
-    s.themes.forEach(t => {
-      const opt = document.createElement("option");
-      opt.value = t[0];
-      opt.textContent = t[1];
-      if (t[0] === s.currentTheme) opt.selected = true;
-      themeSelect.appendChild(opt);
-    });
-  }
+  (s.themes || []).forEach(t => {
+    const opt = document.createElement("option");
+    opt.value = t[0];
+    opt.textContent = t[1];
+    opt.dataset.name = t[1];
+    if (t[0] === s.currentTheme) opt.selected = true;
+    themeSelect.appendChild(opt);
+  });
+  updateThemePreview(s);
+  renderThemeGallery(s);
 
   document.getElementById("soundSelect").value = s.soundMode || "adzan";
+  document.getElementById("mosqueNameInput").value = s.mosqueName || "";
   document.getElementById("chkCountdown").checked = s.countdownEnabled !== false;
   document.getElementById("chkCountdownAudio").checked = s.countdownAudioEnabled !== false;
   document.getElementById("chkKeepAwake").checked = s.keepAwake !== false;
@@ -693,15 +778,164 @@ function populateSettings(s) {
   document.getElementById("chkShowTrans").checked = s.showTranslation !== false;
 }
 
+// ==========================================
+// CITY SEARCHABLE DROPDOWN
+// ==========================================
+function filterCities(query) {
+  const citySelect = document.getElementById("citySelect");
+  const currentCityId = citySelect.value;
+  const all = (cachedSettings.cities || []);
+  const q = (query || "").trim().toLowerCase();
+  const matches = q
+      ? all.filter(c => c.name.toLowerCase().includes(q) || (c.province || "").toLowerCase().includes(q))
+      : all;
+
+  citySelect.innerHTML = "";
+  matches.forEach(c => {
+    const opt = document.createElement("option");
+    opt.value = c.id;
+    opt.dataset.name = c.name;
+    opt.textContent = c.province ? (c.name + " - " + c.province) : c.name;
+    citySelect.appendChild(opt);
+  });
+  if (matches.some(c => c.id === currentCityId)) citySelect.value = currentCityId;
+
+  const hint = document.getElementById("citySearchHint");
+  if (q) {
+    hint.textContent = matches.length + " hasil untuk \"" + query.trim() + "\".";
+  } else {
+    hint.textContent = "Menampilkan seluruh " + all.length + " kota/kabupaten.";
+  }
+}
+
+// ==========================================
+// THEME PREVIEW GALLERY + CUSTOM BACKGROUND
+// ==========================================
+function currentThemeLabel(s) {
+  const theme = (s.themes || []).find(t => t[0] === s.currentTheme);
+  return theme ? theme[1] : (s.currentTheme || "-");
+}
+
+function updateThemePreview(s) {
+  s = s || cachedSettings;
+  const img = document.getElementById("themeCurrentImg");
+  const label = document.getElementById("themeCurrentLabel");
+  if (s.customBgActive && s.customBgFile) {
+    img.src = "/images/" + encodeURIComponent(s.customBgFile) + "?t=" + Date.now();
+    label.textContent = "Background Kustom (Upload)";
+    document.getElementById("bgUploadHint").textContent = "Background kustom aktif. Pilih tema untuk kembali ke tema bawaan.";
+  } else {
+    img.src = "/backgrounds/" + encodeURIComponent(s.currentTheme || "");
+    label.textContent = currentThemeLabel(s);
+    document.getElementById("bgUploadHint").textContent = "Background kustom akan langsung diterapkan ke TV.";
+  }
+}
+
+function renderThemeGallery(s) {
+  const grid = document.getElementById("themeGalleryGrid");
+  grid.innerHTML = "";
+  (s.themes || []).forEach(t => {
+    const card = document.createElement("div");
+    card.className = "theme-card" + (t[0] === s.currentTheme && !s.customBgActive ? " active" : "");
+    card.innerHTML = `
+      <img src="/backgrounds/${encodeURIComponent(t[0])}" alt="${escapeHtml(t[1])}" loading="lazy">
+      <span class="theme-card-label">${escapeHtml(t[1])}${t[0] === s.currentTheme && !s.customBgActive ? " ✓" : ""}</span>
+    `;
+    card.addEventListener("click", () => applyTheme(t[0]));
+    grid.appendChild(card);
+  });
+}
+
+async function applyTheme(themeFile) {
+  try {
+    const res = await fetch("/api/theme/save", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pin: currentPin, theme: themeFile })
+    });
+    const d = await res.json();
+    if (d.status) {
+      document.getElementById("themeGalleryModal").classList.add("hidden");
+      await loadSettings();
+    } else {
+      alert("Gagal menerapkan tema: " + (d.message || ""));
+    }
+  } catch (err) {
+    alert("Gagal menerapkan tema: " + err);
+  }
+}
+
+function initThemeControls() {
+  document.getElementById("themePickerTrigger").addEventListener("click", () => {
+    renderThemeGallery(cachedSettings);
+    document.getElementById("themeGalleryModal").classList.remove("hidden");
+  });
+  document.getElementById("closeThemeGalleryBtn").addEventListener("click", () => {
+    document.getElementById("themeGalleryModal").classList.add("hidden");
+  });
+
+  document.getElementById("bgUploadBtn").addEventListener("click", async () => {
+    const fileInput = document.getElementById("bgImageFile");
+    if (!fileInput.files.length) {
+      alert("Pilih file gambar terlebih dahulu.");
+      return;
+    }
+    const file = fileInput.files[0];
+    const fileName = "bg_custom_" + Date.now() + "_" + file.name.replace(/[^a-zA-Z0-9._-]/g, "");
+    document.getElementById("bgUploadHint").textContent = "Mengunggah background...";
+    try {
+      const base64Data = await toBase64(file);
+      const res = await fetch("/api/upload-background", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pin: currentPin, fileName, base64Data })
+      });
+      const d = await res.json();
+      if (d.status) {
+        fileInput.value = "";
+        await loadSettings();
+        document.getElementById("bgUploadHint").textContent = "Background kustom berhasil diterapkan.";
+      } else {
+        alert("Gagal upload background: " + (d.message || ""));
+      }
+    } catch (err) {
+      alert("Gagal upload background: " + err);
+    }
+  });
+
+  document.getElementById("bgResetBtn").addEventListener("click", async () => {
+    try {
+      const res = await fetch("/api/background/reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pin: currentPin })
+      });
+      const d = await res.json();
+      if (d.status) {
+        await loadSettings();
+      } else {
+        alert("Gagal menghapus background kustom: " + (d.message || ""));
+      }
+    } catch (err) {
+      alert("Gagal menghapus background kustom: " + err);
+    }
+  });
+}
+
+function initCitySearch() {
+  document.getElementById("citySearch").addEventListener("input", (e) => filterCities(e.target.value));
+}
+
 function initSettingsForm() {
   document.getElementById("settingsForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     const citySelect = document.getElementById("citySelect");
+    const cityOpt = citySelect.options[citySelect.selectedIndex];
     const payload = {
       pin: currentPin,
       cityId: citySelect.value,
-      cityName: citySelect.options[citySelect.selectedIndex].text,
-      theme: document.getElementById("themeSelect").value,
+      cityName: cityOpt ? (cityOpt.dataset.name || cityOpt.textContent) : "",
+      mosqueName: document.getElementById("mosqueNameInput").value.trim(),
       soundMode: document.getElementById("soundSelect").value,
       countdownEnabled: document.getElementById("chkCountdown").checked,
       countdownAudioEnabled: document.getElementById("chkCountdownAudio").checked,

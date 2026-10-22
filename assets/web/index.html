@@ -72,9 +72,22 @@
 
         <form id="settingsForm" class="settings-form">
           <div class="card">
+            <h3>🏛 Identitas Masjid</h3>
+            <div class="form-group">
+              <label for="mosqueNameInput">Nama Masjid (Tampil di header atas)</label>
+              <input type="text" id="mosqueNameInput" class="form-control" placeholder="Contoh: Masjid Al-Ikhlas">
+            </div>
+          </div>
+
+          <div class="card">
             <h3>📍 Lokasi Hisab Kemenag</h3>
             <div class="form-group">
-              <label for="citySelect">Pilih Kota / Kabupaten (518 Kota)</label>
+              <label for="citySearch">Cari Kota / Kabupaten / Provinsi</label>
+              <input type="search" id="citySearch" class="form-control" placeholder="🔍 Ketik nama kota atau provinsi..." autocomplete="off">
+              <p class="hint-inline" id="citySearchHint">Menampilkan seluruh 518 kota/kabupaten.</p>
+            </div>
+            <div class="form-group">
+              <label for="citySelect">Pilih Kota / Kabupaten (format: Kota - Provinsi)</label>
               <select id="citySelect" class="form-control"></select>
             </div>
           </div>
@@ -82,8 +95,25 @@
           <div class="card">
             <h3>🖼 Tema Background TV</h3>
             <div class="form-group">
-              <label for="themeSelect">Pilih Tema Background (20 Foto Masjid + 10 Motif)</label>
-              <select id="themeSelect" class="form-control"></select>
+              <label>Background Aktif</label>
+              <div id="themePickerTrigger" class="theme-picker-trigger" role="button" tabindex="0">
+                <img id="themeCurrentImg" class="theme-picker-thumb" alt="Preview background aktif">
+                <div class="theme-picker-info">
+                  <span id="themeCurrentLabel">Memuat tema...</span>
+                  <span class="theme-picker-sub">Klik untuk melihat preview semua tema</span>
+                </div>
+                <span class="theme-picker-arrow">›</span>
+              </div>
+              <select id="themeSelect" class="hidden"></select>
+            </div>
+            <div class="form-group">
+              <label for="bgImageFile">Upload Background Kustom (JPG/PNG)</label>
+              <input type="file" id="bgImageFile" class="form-control" accept="image/jpeg,image/png,image/webp">
+              <div class="form-row" style="margin-top: 8px;">
+                <button type="button" id="bgUploadBtn" class="btn btn-primary btn-sm">⬆ Upload &amp; Terapkan</button>
+                <button type="button" id="bgResetBtn" class="btn btn-outline-danger btn-sm">↩ Kembali ke Tema</button>
+              </div>
+              <p class="hint-inline" id="bgUploadHint">Background kustom akan langsung diterapkan ke TV.</p>
             </div>
           </div>
 
@@ -183,6 +213,18 @@
       </section>
     </div>
 
+    <!-- MODAL THEME PREVIEW GALLERY -->
+    <div id="themeGalleryModal" class="modal-overlay hidden">
+      <div class="modal-card modal-lg">
+        <div class="modal-header-row">
+          <h3>🎨 Pilih Tema Background</h3>
+          <button type="button" id="closeThemeGalleryBtn" class="btn btn-secondary btn-sm">Tutup</button>
+        </div>
+        <p class="section-desc">Klik salah satu tema untuk langsung menerapkannya ke TV.</p>
+        <div id="themeGalleryGrid" class="theme-gallery-grid"></div>
+      </div>
+    </div>
+
     <!-- MODAL SLIDE EDITOR -->
     <div id="slideEditorModal" class="modal-overlay hidden">
       <div class="modal-card modal-lg">
@@ -251,7 +293,7 @@
               <h4>📢 Daftar Agenda Masjid (Hero + Daftar 6)</h4>
               <button type="button" id="addAgendaItemBtn" class="btn btn-sm btn-success">+ Tambah Agenda</button>
             </div>
-            <p style="font-size: 11px; color: var(--text-dim); margin-bottom: 12px;">Agenda #1 otomatis tampil sebagai sorotan utama (Slide A), sedangkan agenda #2 s/d #7 tampil di tabel daftar agenda berikutnya (Slide B).</p>
+            <p style="font-size: 11px; color: var(--text-dim); margin-bottom: 12px;">Agenda #1 otomatis tampil sebagai sorotan utama (Slide A), sedangkan agenda #2 s/d #7 tampil di tabel daftar agenda berikutnya (Slide B). Pada Dashboard Multi-Panel, daftar agenda ini dipakai sesuai pilihan "Tampilan Widget Agenda di Panel".</p>
             <div id="agendaItemsContainer" style="display: flex; flex-direction: column; gap: 10px;"></div>
           </div>
 
@@ -274,7 +316,7 @@
               <h4>📹 Multi-Stream CCTV (Grid Dinamis 1-6 Kamera)</h4>
               <button type="button" id="addCctvStreamBtn" class="btn btn-sm btn-success">+ Tambah Kamera</button>
             </div>
-            <p style="font-size: 11px; color: var(--text-dim); margin-bottom: 12px;">Masukkan URL RTSP masing-masing kamera pengawasan. Layout grid (1x1, 1x2, 2x2, 2x3) menyesuaikan otomatis.</p>
+            <p style="font-size: 11px; color: var(--text-dim); margin-bottom: 12px;">Masukkan URL RTSP masing-masing kamera pengawasan. Layout grid (1x1, 1x2, 2x2, 2x3) menyesuaikan otomatis. Daftar kamera ini dipakai bersama oleh slide CCTV maupun panel CCTV di Dashboard Multi-Panel.</p>
             <div id="cctvStreamsContainer" style="display: flex; flex-direction: column; gap: 10px;"></div>
           </div>
 
@@ -294,30 +336,38 @@
           <div id="fieldsMultiPanel" class="dynamic-section hidden">
             <h4>🎛 Konfigurasi Dashboard Multi-Panel</h4>
 
-            <!-- VISUAL PREVIEW TATA LETAK MULTI-PANEL -->
+            <!-- VISUAL PREVIEW TATA LETAK MULTI-PANEL DENGAN DRAG PUZZLE BLOK -->
             <div class="panel-preview-wrapper">
               <div class="panel-preview-header">
-                <span>🖥 Visual Preview Layout TV</span>
+                <span>🖥 Visual Puzzle Mockup (Bisa Ditukar / Digeser Posisi Blok)</span>
                 <span class="preview-badge" id="previewLayoutLabel">Split 60% : 40%</span>
               </div>
+              <p class="puzzle-instruction">💡 <b>Geser & Tukar Blok Puzzle</b>: Tarik salah satu kotak panel ke kotak lain untuk menukar posisi widget secara instan, atau klik tombol ⇄ Tukar.</p>
+
               <div id="livePanelMockup" class="panel-mockup-screen layout-split">
-                <div class="mockup-slot slot-a" id="previewSlotA">
+                <div class="mockup-slot slot-a puzzle-slot" id="previewSlotA" draggable="true" data-slot="A">
+                  <div class="slot-drag-tag">☰ TARIK PUZZLE</div>
                   <div class="slot-badge">Panel A (Kiri/Atas)</div>
                   <div class="slot-icon" id="previewIconA">📹</div>
                   <div class="slot-title" id="previewTitleA">Live RTSP Cam</div>
                   <div class="slot-desc" id="previewDescA">Stream RTSP</div>
+                  <button type="button" class="btn-swap-slot" onclick="swapSlots('A','B')">⇄ Tukar B</button>
                 </div>
-                <div class="mockup-slot slot-b" id="previewSlotB">
+                <div class="mockup-slot slot-b puzzle-slot" id="previewSlotB" draggable="true" data-slot="B">
+                  <div class="slot-drag-tag">☰ TARIK PUZZLE</div>
                   <div class="slot-badge">Panel B (Kanan/Bawah)</div>
                   <div class="slot-icon" id="previewIconB">🕌</div>
                   <div class="slot-title" id="previewTitleB">Jadwal Sholat</div>
                   <div class="slot-desc" id="previewDescB">Jam & 5 Waktu</div>
+                  <button type="button" class="btn-swap-slot" onclick="swapSlots('B','A')">⇄ Tukar A</button>
                 </div>
-                <div class="mockup-slot slot-c hidden" id="previewSlotC">
+                <div class="mockup-slot slot-c puzzle-slot hidden" id="previewSlotC" draggable="true" data-slot="C">
+                  <div class="slot-drag-tag">☰ TARIK PUZZLE</div>
                   <div class="slot-badge">Panel C</div>
                   <div class="slot-icon" id="previewIconC">💰</div>
                   <div class="slot-title" id="previewTitleC">Laporan Kas</div>
                   <div class="slot-desc" id="previewDescC">Keuangan Masjid</div>
+                  <button type="button" class="btn-swap-slot" onclick="swapSlots('C','A')">⇄ Tukar A</button>
                 </div>
                 <div class="mockup-marquee marquee-green" id="previewMarqueeBar">
                   <span class="marquee-tag">📢 INFO:</span>
@@ -383,6 +433,7 @@
                   <option value="PRAYER" selected>Jadwal Sholat Mini & Jam</option>
                   <option value="AGENDA">Agenda Kajian</option>
                   <option value="KAS">Laporan Kas</option>
+                  <option value="CCTV">CCTV Grid</option>
                 </select>
               </div>
               <div class="form-group col hidden" id="slotThirdContainer">
@@ -391,8 +442,17 @@
                   <option value="KAS" selected>Laporan Kas</option>
                   <option value="AGENDA">Agenda Kajian</option>
                   <option value="PRAYER">Jadwal Sholat</option>
+                  <option value="CCTV">CCTV Grid</option>
                 </select>
               </div>
+            </div>
+            <div class="form-group">
+              <label for="panelAgendaMode">Tampilan Widget Agenda di Panel</label>
+              <select id="panelAgendaMode" class="form-control">
+                <option value="0" selected>Agenda Terdekat (1 Sorotan Tunggal)</option>
+                <option value="1">Daftar Semua Agenda (Rangkaian Agenda)</option>
+              </select>
+              <p style="font-size: 11px; color: var(--text-dim); margin-top: 4px;">Berlaku untuk panel bertipe AGENDA. Daftar agenda diisi pada section "Daftar Agenda Masjid" di bawah.</p>
             </div>
             <div class="form-group">
               <label for="runningTextInput">Teks Berjalan di Bawah (Running Text Marquee)</label>

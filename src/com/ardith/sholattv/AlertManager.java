@@ -202,6 +202,11 @@ public final class AlertManager {
                 .edit().putString(KEY_CUSTOM_BG_URI, uriStr).apply();
     }
 
+    public void clearCustomBg() {
+        ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit().remove(KEY_CUSTOM_BG_URI).apply();
+    }
+
     public void playCountdownPip(int remainingSec) {
         if (!isCountdownAudioEnabled() || MODE_SILENT.equals(getSoundMode())) {
             return;

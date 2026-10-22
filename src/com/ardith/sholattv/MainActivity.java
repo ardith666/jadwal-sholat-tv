@@ -17,6 +17,16 @@ import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.animation.AlphaAnimation;
+import android.widget.FrameLayout;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.TextView;
+import android.widget.Toast;
+import android.view.Gravity;
+import android.view.KeyEvent;
+import android.view.View;
+import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.view.animation.AlphaAnimation;
 import android.widget.FrameLayout;
@@ -75,6 +85,7 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
     private TextView clockText;
     private TextView dateText;
     private TextView locationBadge;
+    private TextView mosqueNameText;
     private TextView settingsBtn;
     private TextView countdownBanner;
     private TextView creditText;
@@ -252,8 +263,16 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
     private void applyTheme() {
         String customUri = alertManager.getCustomBgUri();
         if (customUri != null) {
-            try (InputStream in = getContentResolver().openInputStream(Uri.parse(customUri))) {
-                Bitmap bmp = BitmapFactory.decodeStream(in);
+            try {
+                Uri uri = Uri.parse(customUri);
+                Bitmap bmp;
+                if ("file".equals(uri.getScheme())) {
+                    bmp = BitmapFactory.decodeFile(uri.getPath());
+                } else {
+                    try (InputStream in = getContentResolver().openInputStream(uri)) {
+                        bmp = BitmapFactory.decodeStream(in);
+                    }
+                }
                 if (bmp != null) {
                     bgImageView.setImageBitmap(bmp);
                     return;
@@ -313,6 +332,17 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
         leftHeader.addView(dateText);
 
         header.addView(leftHeader, new LinearLayout.LayoutParams(0, -2, 1f));
+
+        // Nama Masjid di tengah header (sebelah jam/lokasi)
+        mosqueNameText = new TextView(this);
+        mosqueNameText.setTextColor(0xFFFFD700);
+        mosqueNameText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
+        mosqueNameText.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+        mosqueNameText.setGravity(Gravity.CENTER);
+        mosqueNameText.setMaxLines(1);
+        mosqueNameText.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        updateMosqueNameText();
+        header.addView(mosqueNameText, new LinearLayout.LayoutParams(0, -2, 1.2f));
 
         LinearLayout rightHeader = new LinearLayout(this);
         rightHeader.setOrientation(LinearLayout.HORIZONTAL);
@@ -507,6 +537,18 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
 
         setContentView(rootLayout);
         rotateQuranVerse();
+    }
+
+    private void updateMosqueNameText() {
+        if (mosqueNameText == null || prayerEngine == null) return;
+        String name = prayerEngine.getMosqueName();
+        if (name == null || name.trim().isEmpty()) {
+            mosqueNameText.setText("");
+            mosqueNameText.setVisibility(View.GONE);
+            return;
+        }
+        mosqueNameText.setText(name.trim());
+        mosqueNameText.setVisibility(View.VISIBLE);
     }
 
     private void updateFooterIpText() {
@@ -945,6 +987,7 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
     @Override
     public void onLocationChanged() {
         locationBadge.setText("📍 " + prayerEngine.getCityName());
+        updateMosqueNameText();
         loadScheduleAsync();
         Toast.makeText(this, "Lokasi diubah ke " + prayerEngine.getCityName(), Toast.LENGTH_SHORT).show();
     }
@@ -983,6 +1026,7 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
     @Override
     public void onSettingsUpdated() {
         locationBadge.setText("📍 " + prayerEngine.getCityName());
+        updateMosqueNameText();
         loadScheduleAsync();
         applyKeepAwake();
         applyTheme();

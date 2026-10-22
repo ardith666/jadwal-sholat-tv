@@ -165,8 +165,17 @@ public final class WebServerManager {
                 String imgName = path.substring(8);
                 File imgFile = new File(slideManager.getImageFolder(), imgName);
                 if (imgFile.exists()) {
-                    sendFile(imgFile, "image/jpeg", out);
+                    sendFile(imgFile, guessImageType(imgFile.getName()), out);
                     return;
+                }
+            } else if (path.startsWith("/backgrounds/")) {
+                // Serve bundled theme backgrounds for the admin preview gallery
+                String bgName = safeFileName(path.substring(13));
+                if (bgName != null) {
+                    try {
+                        sendAssetFile("backgrounds/" + bgName, "image/jpeg", out);
+                        return;
+                    } catch (Exception ignored) {}
                 }
             }
         }
@@ -228,10 +237,71 @@ public final class WebServerManager {
             return;
         }
 
+        if ("/api/upload-background".equals(path) && "POST".equalsIgnoreCase(method)) {
+            JSONObject req = new JSONObject(body);
+            String pin = req.optString("pin", "");
+            if (!slideManager.getAdminPin().equals(pin)) {
+                sendJsonResponse(out, new JSONObject().put("status", false).put("message", "PIN Salah"));
+                return;
+            }
+            String fileName = req.optString("fileName", "");
+            String safe = safeFileName(fileName);
+            if (safe == null) {
+                sendJsonResponse(out, new JSONObject().put("status", false).put("message", "Nama file tidak valid"));
+                return;
+            }
+            String base64Data = req.optString("base64Data", "");
+            if (base64Data.isEmpty()) {
+                sendJsonResponse(out, new JSONObject().put("status", false).put("message", "Data gambar kosong"));
+                return;
+            }
+            byte[] bytes = Base64.decode(base64Data, Base64.DEFAULT);
+            File target = new File(slideManager.getImageFolder(), safe);
+            try (FileOutputStream fos = new FileOutputStream(target)) {
+                fos.write(bytes);
+            }
+            alertManager.setCustomBgUri(android.net.Uri.fromFile(target).toString());
+            notifySettingsUpdated();
+            sendJsonResponse(out, new JSONObject().put("status", true).put("fileName", safe));
+            return;
+        }
+
+        if ("/api/theme/save".equals(path) && "POST".equalsIgnoreCase(method)) {
+            JSONObject req = new JSONObject(body);
+            String pin = req.optString("pin", "");
+            if (!slideManager.getAdminPin().equals(pin)) {
+                sendJsonResponse(out, new JSONObject().put("status", false).put("message", "PIN Salah"));
+                return;
+            }
+            String theme = req.optString("theme", "");
+            if (safeFileName(theme) == null) {
+                sendJsonResponse(out, new JSONObject().put("status", false).put("message", "Tema tidak valid"));
+                return;
+            }
+            alertManager.setTheme(theme);
+            notifySettingsUpdated();
+            sendJsonResponse(out, new JSONObject().put("status", true));
+            return;
+        }
+
+        if ("/api/background/reset".equals(path) && "POST".equalsIgnoreCase(method)) {
+            JSONObject req = new JSONObject(body);
+            String pin = req.optString("pin", "");
+            if (!slideManager.getAdminPin().equals(pin)) {
+                sendJsonResponse(out, new JSONObject().put("status", false).put("message", "PIN Salah"));
+                return;
+            }
+            alertManager.clearCustomBg();
+            notifySettingsUpdated();
+            sendJsonResponse(out, new JSONObject().put("status", true));
+            return;
+        }
+
         if ("/api/settings".equals(path) && "GET".equalsIgnoreCase(method)) {
             JSONObject s = new JSONObject();
             s.put("currentCityId", prayerEngine.getCityId());
             s.put("currentCityName", prayerEngine.getCityName());
+            s.put("mosqueName", prayerEngine.getMosqueName());
             s.put("currentTheme", alertManager.getTheme());
             s.put("soundMode", alertManager.getSoundMode());
             s.put("countdownEnabled", alertManager.isCountdownEnabled());
@@ -252,9 +322,21 @@ public final class WebServerManager {
             Collections.sort(cities, (a, b) -> a.name.compareToIgnoreCase(b.name));
             JSONArray cArr = new JSONArray();
             for (PrayerEngine.City c : cities) {
-                cArr.put(new JSONObject().put("id", c.id).put("name", c.name));
+                cArr.put(new JSONObject().put("id", c.id).put("name", c.name).put("province", c.province));
             }
             s.put("cities", cArr);
+
+            String customBg = alertManager.getCustomBgUri();
+            String customBgFile = "";
+            if (customBg != null) {
+                int slash = Math.max(customBg.lastIndexOf('/'), customBg.lastIndexOf("%2F"));
+                customBgFile = slash >= 0 ? customBg.substring(slash + 1) : customBg;
+                try {
+                    customBgFile = java.net.URLDecoder.decode(customBgFile, "UTF-8");
+                } catch (Exception ignored) {}
+            }
+            s.put("customBgActive", customBg != null);
+            s.put("customBgFile", customBgFile);
 
             JSONArray tArr = new JSONArray();
             for (String[] t : SettingsDialog.DARK_THEMES) {
@@ -278,7 +360,11 @@ public final class WebServerManager {
             }
 
             prayerEngine.setCity(req.optString("cityId"), req.optString("cityName"));
-            alertManager.setTheme(req.optString("theme"));
+            prayerEngine.setMosqueName(req.optString("mosqueName"));
+            String savedTheme = req.optString("theme", "");
+            if (!savedTheme.isEmpty() && !savedTheme.equals(alertManager.getTheme())) {
+                alertManager.setTheme(savedTheme);
+            }
             alertManager.setSoundMode(req.optString("soundMode"));
             alertManager.setCountdownEnabled(req.optBoolean("countdownEnabled", true));
             alertManager.setCountdownAudioEnabled(req.optBoolean("countdownAudioEnabled", true));
@@ -319,6 +405,21 @@ public final class WebServerManager {
 
         // 404 NOT FOUND
         send404(out);
+    }
+
+    private static String guessImageType(String name) {
+        String lower = name == null ? "" : name.toLowerCase(Locale.ROOT);
+        if (lower.endsWith(".png")) return "image/png";
+        if (lower.endsWith(".webp")) return "image/webp";
+        if (lower.endsWith(".gif")) return "image/gif";
+        return "image/jpeg";
+    }
+
+    private static String safeFileName(String name) {
+        if (name == null) return null;
+        String trimmed = name.trim();
+        if (trimmed.isEmpty() || trimmed.contains("/") || trimmed.contains("\\") || trimmed.contains("..")) return null;
+        return trimmed.replaceAll("[^a-zA-Z0-9._-]", "_");
     }
 
     private void notifySlidesUpdated() {

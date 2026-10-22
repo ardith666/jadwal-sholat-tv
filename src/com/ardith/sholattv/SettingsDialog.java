@@ -532,7 +532,7 @@ public final class SettingsDialog {
 
         final List<PrayerEngine.City> filtered = new ArrayList<>(allCities);
         final List<String> displayList = new ArrayList<>();
-        for (PrayerEngine.City c : filtered) displayList.add(c.name);
+        for (PrayerEngine.City c : filtered) displayList.add(c.getDisplayName());
 
         LinearLayout layout = new LinearLayout(context);
         layout.setOrientation(LinearLayout.VERTICAL);
@@ -566,9 +566,11 @@ public final class SettingsDialog {
                 filtered.clear();
                 displayList.clear();
                 for (PrayerEngine.City c : allCities) {
-                    if (query.isEmpty() || c.name.toLowerCase(Locale.ROOT).contains(query)) {
+                    if (query.isEmpty()
+                            || c.name.toLowerCase(Locale.ROOT).contains(query)
+                            || c.province.toLowerCase(Locale.ROOT).contains(query)) {
                         filtered.add(c);
-                        displayList.add(c.name);
+                        displayList.add(c.getDisplayName());
                     }
                 }
                 adapter.notifyDataSetChanged();

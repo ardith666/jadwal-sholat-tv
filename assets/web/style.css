@@ -342,6 +342,126 @@ body {
   flex: 1;
 }
 
+.hint-inline {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 6px;
+}
+
+/* THEME PICKER + GALLERY */
+.theme-picker-trigger {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  background: #0D1117;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.theme-picker-trigger:hover,
+.theme-picker-trigger:focus {
+  border-color: var(--accent-gold);
+  background: var(--bg-card-hover);
+  outline: none;
+}
+
+.theme-picker-thumb {
+  width: 120px;
+  height: 68px;
+  object-fit: cover;
+  border-radius: 6px;
+  background: #21262D;
+  flex-shrink: 0;
+}
+
+.theme-picker-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.theme-picker-info span:first-child {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.theme-picker-sub {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.theme-picker-arrow {
+  margin-left: auto;
+  font-size: 26px;
+  color: var(--text-dim);
+  padding-right: 6px;
+}
+
+.theme-gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.theme-card {
+  background: #0D1117;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.theme-card:hover {
+  border-color: var(--accent-gold);
+  transform: translateY(-2px);
+}
+
+.theme-card.active {
+  border-color: var(--accent-gold);
+  box-shadow: 0 0 0 1px var(--accent-gold);
+}
+
+.theme-card img {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  display: block;
+  background: #21262D;
+}
+
+.theme-card-label {
+  display: block;
+  padding: 8px 10px;
+  font-size: 11px;
+  color: var(--text-main);
+  text-align: center;
+}
+
+.theme-card.active .theme-card-label {
+  color: var(--accent-gold);
+  font-weight: 700;
+}
+
+.modal-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.modal-header-row h3 {
+  font-size: 17px;
+  color: var(--accent-gold);
+}
+
 .checkbox-group {
   display: flex;
   flex-direction: column;
@@ -425,6 +545,58 @@ body {
   padding: 2px 8px;
   border-radius: 10px;
   font-size: 11px;
+}
+
+.puzzle-instruction {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+.puzzle-slot {
+  cursor: grab;
+  user-select: none;
+}
+
+.puzzle-slot:active {
+  cursor: grabbing;
+}
+
+.puzzle-slot.puzzle-dragover {
+  border: 2px dashed var(--accent-gold) !important;
+  background: rgba(255, 215, 0, 0.15) !important;
+  transform: scale(0.98);
+}
+
+.slot-drag-tag {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  font-size: 8px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #FFF;
+  padding: 1px 4px;
+  border-radius: 4px;
+  font-weight: bold;
+}
+
+.btn-swap-slot {
+  margin-top: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #FFF;
+  border-radius: 4px;
+  font-size: 9px;
+  padding: 2px 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-swap-slot:hover {
+  background: var(--accent-gold);
+  color: #000;
+  border-color: var(--accent-gold);
 }
 
 /* TV SCREEN MOCKUP */
