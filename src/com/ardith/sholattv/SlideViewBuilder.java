@@ -431,13 +431,16 @@ public final class SlideViewBuilder {
                 + "function onYouTubeIframeAPIReady() {"
                 + "  player = new YT.Player('player', {"
                 + "    videoId: '" + videoId + "',"
-                + "    playerVars: { 'autoplay': 1, 'controls': 0, 'rel': 0, 'playsinline': 1, 'modestbranding': 1 },"
-                + "    events: { 'onReady': onPlayerReady, 'onStateChange': onPlayerStateChange }"
+                + "    playerVars: { 'autoplay': 1, 'controls': 0, 'rel': 0, 'playsinline': 1, 'modestbranding': 1, 'origin': 'https://www.youtube.com' },"
+                + "    events: { 'onReady': onPlayerReady, 'onStateChange': onPlayerStateChange, 'onError': onPlayerError }"
                 + "  });"
                 + "}"
                 + "function onPlayerReady(event) { event.target.playVideo(); }"
                 + "function onPlayerStateChange(event) {"
                 + "  if (event.data === YT.PlayerState.ENDED) { Android.onEnded(); }"
+                + "}"
+                + "function onPlayerError(event) {"
+                + "  Android.onError(event.data);"
                 + "}"
                 + "</script></body></html>";
 
@@ -447,6 +450,21 @@ public final class SlideViewBuilder {
                 if (holder != null) {
                     ((android.app.Activity) ctx).runOnUiThread(holder::onVideoEnded);
                 }
+            }
+            @android.webkit.JavascriptInterface
+            public void onError(int errorCode) {
+                ((android.app.Activity) ctx).runOnUiThread(() -> {
+                    String msg = "Error " + errorCode;
+                    if (errorCode == 101 || errorCode == 150) {
+                        msg = "Video tidak mengizinkan pemutaran via aplikasi luar (Pembatasan Hak Cipta/Embedding oleh pemilik video).";
+                    } else if (errorCode == 100) {
+                        msg = "Video YouTube tidak ditemukan atau sudah dihapus/privat.";
+                    }
+                    Toast.makeText(ctx, "YouTube: " + msg, Toast.LENGTH_LONG).show();
+                    if (holder != null) {
+                        holder.onVideoEnded(); // auto-skip jika diblokir hak cipta
+                    }
+                });
             }
         }, "Android");
 
