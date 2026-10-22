@@ -419,6 +419,8 @@ public final class SlideViewBuilder {
         ws.setUserAgentString("Mozilla/5.0 (Linux; Android 14; Android TV) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
 
         String videoId = extractYouTubeVideoId(m.youtubeUrl);
+        String appOrigin = "https://" + ctx.getPackageName();
+
         String embedHtml = "<!DOCTYPE html><html><head>"
                 + "<meta name='viewport' content='width=device-width, initial-scale=1.0'>"
                 + "<style>body,html{margin:0;padding:0;width:100%;height:100%;background:#000;overflow:hidden;}"
@@ -431,7 +433,7 @@ public final class SlideViewBuilder {
                 + "function onYouTubeIframeAPIReady() {"
                 + "  player = new YT.Player('player', {"
                 + "    videoId: '" + videoId + "',"
-                + "    playerVars: { 'autoplay': 1, 'controls': 0, 'rel': 0, 'playsinline': 1, 'modestbranding': 1, 'origin': 'https://www.youtube.com' },"
+                + "    playerVars: { 'autoplay': 1, 'controls': 0, 'rel': 0, 'playsinline': 1, 'enablejsapi': 1, 'fs': 0, 'origin': '" + appOrigin + "' },"
                 + "    events: { 'onReady': onPlayerReady, 'onStateChange': onPlayerStateChange, 'onError': onPlayerError }"
                 + "  });"
                 + "}"
@@ -468,7 +470,7 @@ public final class SlideViewBuilder {
             }
         }, "Android");
 
-        webView.loadDataWithBaseURL("https://www.youtube.com", embedHtml, "text/html", "UTF-8", null);
+        webView.loadDataWithBaseURL(appOrigin, embedHtml, "text/html", "UTF-8", null);
 
         if (holder != null) {
             holder.registerWebView(webView);
