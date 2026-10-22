@@ -293,17 +293,76 @@
           <!-- DYNAMIC FIELDS: MULTI-PANEL -->
           <div id="fieldsMultiPanel" class="dynamic-section hidden">
             <h4>🎛 Konfigurasi Dashboard Multi-Panel</h4>
-            <div class="form-group">
-              <label for="panelPreset">Model Preset Layout</label>
-              <select id="panelPreset" class="form-control">
-                <option value="SPLIT_60_40">Split Kiri-Kanan (60% Kiri : 40% Kanan)</option>
-                <option value="THREE_COLUMNS">3 Kolom Sejajar (38% : 31% : 31%)</option>
-                <option value="TOP_BOTTOM">Atas-Bawah (65% Video Atas : 35% Jadwal Bawah)</option>
-              </select>
+
+            <!-- VISUAL PREVIEW TATA LETAK MULTI-PANEL -->
+            <div class="panel-preview-wrapper">
+              <div class="panel-preview-header">
+                <span>🖥 Visual Preview Layout TV</span>
+                <span class="preview-badge" id="previewLayoutLabel">Split 60% : 40%</span>
+              </div>
+              <div id="livePanelMockup" class="panel-mockup-screen layout-split">
+                <div class="mockup-slot slot-a" id="previewSlotA">
+                  <div class="slot-badge">Panel A (Kiri/Atas)</div>
+                  <div class="slot-icon" id="previewIconA">📹</div>
+                  <div class="slot-title" id="previewTitleA">Live RTSP Cam</div>
+                  <div class="slot-desc" id="previewDescA">Stream RTSP</div>
+                </div>
+                <div class="mockup-slot slot-b" id="previewSlotB">
+                  <div class="slot-badge">Panel B (Kanan/Bawah)</div>
+                  <div class="slot-icon" id="previewIconB">🕌</div>
+                  <div class="slot-title" id="previewTitleB">Jadwal Sholat</div>
+                  <div class="slot-desc" id="previewDescB">Jam & 5 Waktu</div>
+                </div>
+                <div class="mockup-slot slot-c hidden" id="previewSlotC">
+                  <div class="slot-badge">Panel C</div>
+                  <div class="slot-icon" id="previewIconC">💰</div>
+                  <div class="slot-title" id="previewTitleC">Laporan Kas</div>
+                  <div class="slot-desc" id="previewDescC">Keuangan Masjid</div>
+                </div>
+                <div class="mockup-marquee marquee-green" id="previewMarqueeBar">
+                  <span class="marquee-tag">📢 INFO:</span>
+                  <span class="marquee-text" id="previewMarqueeText">Lurus dan rapatkan shaf saat sholat berjamaah...</span>
+                </div>
+              </div>
             </div>
+
+            <!-- PILIHAN PRESET MODEL PREVIEW -->
+            <div class="form-group" style="margin-top: 14px;">
+              <label>Pilih Model Tata Letak (Klik Thumbnail Preset)</label>
+              <div class="preset-thumbnails-grid">
+                <div class="preset-card active" data-preset="SPLIT_60_40" id="cardPresetSplit">
+                  <div class="mini-wireframe wireframe-split">
+                    <div class="wf-left"></div>
+                    <div class="wf-right"></div>
+                  </div>
+                  <div class="preset-title">Split 60:40</div>
+                  <div class="preset-desc">Video Kiri, Jadwal Kanan</div>
+                </div>
+                <div class="preset-card" data-preset="THREE_COLUMNS" id="cardPresetThree">
+                  <div class="mini-wireframe wireframe-three">
+                    <div class="wf-col"></div>
+                    <div class="wf-col"></div>
+                    <div class="wf-col"></div>
+                  </div>
+                  <div class="preset-title">3 Kolom Sejajar</div>
+                  <div class="preset-desc">Video + Sholat + Kas/Agenda</div>
+                </div>
+                <div class="preset-card" data-preset="TOP_BOTTOM" id="cardPresetTopBottom">
+                  <div class="mini-wireframe wireframe-topbottom">
+                    <div class="wf-top"></div>
+                    <div class="wf-bottom"></div>
+                  </div>
+                  <div class="preset-title">Atas-Bawah</div>
+                  <div class="preset-desc">Video Atas, Jadwal Bawah</div>
+                </div>
+              </div>
+              <input type="hidden" id="panelPreset" value="SPLIT_60_40">
+            </div>
+
+            <!-- PILIHAN KONTEN PER SLOT -->
             <div class="form-row">
               <div class="form-group col">
-                <label for="slotLeftType">Konten Panel Kiri / Atas</label>
+                <label for="slotLeftType">Konten Panel A (Kiri / Atas)</label>
                 <select id="slotLeftType" class="form-control">
                   <option value="LIVE_STREAM">Live Stream RTSP</option>
                   <option value="YOUTUBE">YouTube Live / Video</option>
@@ -313,23 +372,23 @@
                 </select>
               </div>
               <div class="form-group col">
-                <label for="slotLeftUrl">URL Stream / Video (Opsional)</label>
+                <label for="slotLeftUrl">URL Stream / Video Panel A</label>
                 <input type="text" id="slotLeftUrl" class="form-control" placeholder="rtsp://... atau link YouTube">
               </div>
             </div>
             <div class="form-row">
               <div class="form-group col">
-                <label for="slotRightType">Konten Panel Kanan / Bawah</label>
+                <label for="slotRightType">Konten Panel B (Kanan / Bawah)</label>
                 <select id="slotRightType" class="form-control">
                   <option value="PRAYER" selected>Jadwal Sholat Mini & Jam</option>
                   <option value="AGENDA">Agenda Kajian</option>
                   <option value="KAS">Laporan Kas</option>
                 </select>
               </div>
-              <div class="form-group col" id="slotThirdContainer">
-                <label for="slotThirdType">Konten Panel Ketiga (Jika 3 Kolom)</label>
+              <div class="form-group col hidden" id="slotThirdContainer">
+                <label for="slotThirdType">Konten Panel C (Kolom Ketiga)</label>
                 <select id="slotThirdType" class="form-control">
-                  <option value="KAS">Laporan Kas</option>
+                  <option value="KAS" selected>Laporan Kas</option>
                   <option value="AGENDA">Agenda Kajian</option>
                   <option value="PRAYER">Jadwal Sholat</option>
                 </select>

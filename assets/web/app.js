@@ -281,6 +281,23 @@ function initSlideEditor() {
     appendCctvStreamRow();
   });
 
+  // Preset Card Clicks
+  document.querySelectorAll(".preset-card").forEach(card => {
+    card.addEventListener("click", () => {
+      const p = card.dataset.preset;
+      selectPresetCard(p);
+      updateLiveMultiPanelPreview();
+    });
+  });
+
+  // Multi-panel form change listeners for real-time visual preview
+  ["slotLeftType", "slotRightType", "slotThirdType", "runningTextBg"].forEach(id => {
+    document.getElementById(id).addEventListener("change", updateLiveMultiPanelPreview);
+  });
+  ["slotLeftUrl", "runningTextInput"].forEach(id => {
+    document.getElementById(id).addEventListener("input", updateLiveMultiPanelPreview);
+  });
+
   document.getElementById("slideForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     const id = document.getElementById("slideId").value || ("slide_" + Date.now());
@@ -415,13 +432,18 @@ function openSlideEditor(slide) {
   document.getElementById("chkLockYoutube").checked = slide ? (slide.isLocked !== false) : true;
 
   // Pre-fill Multi-Panel
-  document.getElementById("panelPreset").value = (slide && slide.multiPanelPreset) ? slide.multiPanelPreset : "SPLIT_60_40";
+  const presetVal = (slide && slide.multiPanelPreset) ? slide.multiPanelPreset : "SPLIT_60_40";
+  document.getElementById("panelPreset").value = presetVal;
+  selectPresetCard(presetVal);
+
   document.getElementById("slotLeftType").value = (slide && slide.slotLeftType) ? slide.slotLeftType : "LIVE_STREAM";
   document.getElementById("slotLeftUrl").value = (slide && slide.slotLeftUrl) ? slide.slotLeftUrl : "";
   document.getElementById("slotRightType").value = (slide && slide.slotRightType) ? slide.slotRightType : "PRAYER";
   document.getElementById("slotThirdType").value = (slide && slide.slotThirdType) ? slide.slotThirdType : "KAS";
   document.getElementById("runningTextInput").value = (slide && slide.runningText) ? slide.runningText : "Lurus dan rapatkan shaf saat sholat berjamaah...";
   document.getElementById("runningTextBg").value = (slide && slide.runningTextBg) ? slide.runningTextBg : "GREEN";
+
+  updateLiveMultiPanelPreview();
 
   // Pre-fill CCTV
   const cctvContainer = document.getElementById("cctvStreamsContainer");
@@ -504,6 +526,98 @@ function collectCctvStreams() {
     }
   });
   return res;
+}
+
+function selectPresetCard(preset) {
+  document.querySelectorAll(".preset-card").forEach(c => c.classList.remove("active"));
+  const target = document.querySelector(`.preset-card[data-preset="${preset}"]`);
+  if (target) target.classList.add("active");
+  document.getElementById("panelPreset").value = preset;
+
+  const thirdContainer = document.getElementById("slotThirdContainer");
+  if (preset === "THREE_COLUMNS") {
+    thirdContainer.classList.remove("hidden");
+  } else {
+    thirdContainer.classList.add("hidden");
+  }
+}
+
+function updateLiveMultiPanelPreview() {
+  const preset = document.getElementById("panelPreset").value || "SPLIT_60_40";
+  const mockup = document.getElementById("livePanelMockup");
+  const label = document.getElementById("previewLayoutLabel");
+
+  mockup.className = "panel-mockup-screen";
+
+  const slotC = document.getElementById("previewSlotC");
+
+  if (preset === "THREE_COLUMNS") {
+    mockup.classList.add("layout-three");
+    label.innerText = "3 Kolom Sejajar (38% : 31% : 31%)";
+    slotC.classList.remove("hidden");
+  } else if (preset === "TOP_BOTTOM") {
+    mockup.classList.add("layout-topbottom");
+    label.innerText = "Atas - Bawah (65% : 35%)";
+    slotC.classList.add("hidden");
+  } else {
+    mockup.classList.add("layout-split");
+    label.innerText = "Split Kiri-Kanan (60% : 40%)";
+    slotC.classList.add("hidden");
+  }
+
+  // Slot A
+  const typeA = document.getElementById("slotLeftType").value;
+  setSlotPreviewContent("A", typeA, document.getElementById("slotLeftUrl").value.trim());
+
+  // Slot B
+  const typeB = document.getElementById("slotRightType").value;
+  setSlotPreviewContent("B", typeB, "");
+
+  // Slot C
+  const typeC = document.getElementById("slotThirdType").value;
+  setSlotPreviewContent("C", typeC, "");
+
+  // Marquee
+  const text = document.getElementById("runningTextInput").value.trim() || "Lurus dan rapatkan shaf saat sholat berjamaah...";
+  document.getElementById("previewMarqueeText").innerText = text;
+
+  const bg = document.getElementById("runningTextBg").value;
+  const marqueeBar = document.getElementById("previewMarqueeBar");
+  marqueeBar.className = "mockup-marquee marquee-" + bg.toLowerCase();
+}
+
+function setSlotPreviewContent(slot, type, url) {
+  const icon = document.getElementById("previewIcon" + slot);
+  const title = document.getElementById("previewTitle" + slot);
+  const desc = document.getElementById("previewDesc" + slot);
+
+  if (!icon || !title || !desc) return;
+
+  if (type === "LIVE_STREAM") {
+    icon.innerText = "📹";
+    title.innerText = "Live Stream RTSP";
+    desc.innerText = url ? "Kamera Terpasang" : "Kamera Khotbah";
+  } else if (type === "YOUTUBE") {
+    icon.innerText = "▶️";
+    title.innerText = "YouTube Video";
+    desc.innerText = "IFrame Player";
+  } else if (type === "CCTV") {
+    icon.innerText = "🎥";
+    title.innerText = "Multi CCTV";
+    desc.innerText = "Grid 1x1 - 2x3";
+  } else if (type === "KAS") {
+    icon.innerText = "💰";
+    title.innerText = "Laporan Kas";
+    desc.innerText = "Infaq & Saldo";
+  } else if (type === "AGENDA") {
+    icon.innerText = "📢";
+    title.innerText = "Agenda Kajian";
+    desc.innerText = "Jadwal Terdekat";
+  } else {
+    icon.innerText = "🕌";
+    title.innerText = "Jadwal Sholat";
+    desc.innerText = "Jam & 5 Waktu";
+  }
 }
 
 function escapeHtml(str) {
