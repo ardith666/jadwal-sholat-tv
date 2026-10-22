@@ -233,7 +233,8 @@ public final class SettingsDialog {
                 "📺 Layar Selalu ON (Anti-Sleep): " + (alertManager.isKeepAwake() ? "ON" : "OFF"),
                 "📖 Tampilkan Teks Arab: " + (alertManager.isShowArab() ? "ON" : "OFF"),
                 "🔤 Tampilkan Teks Latin: " + (alertManager.isShowLatin() ? "ON" : "OFF"),
-                "🇮🇩 Tampilkan Terjemahan: " + (alertManager.isShowTranslation() ? "ON" : "OFF")
+                "🇮🇩 Tampilkan Terjemahan: " + (alertManager.isShowTranslation() ? "ON" : "OFF"),
+                "🔒 Mode Kiosk (Auto-Start + Kunci Layar): " + (alertManager.isKioskEnabled() ? "ON" : "OFF")
         };
 
         AlertDialog[] dialogHolder = new AlertDialog[1];
@@ -307,6 +308,19 @@ public final class SettingsDialog {
                         alertManager.setShowTranslation(!alertManager.isShowTranslation());
                         if (listener != null) listener.onPreferencesChanged();
                         show(context, prayerEngine, alertManager, slideManager, listener);
+                        break;
+                    case 13:
+                        if (alertManager.isKioskEnabled()) {
+                            promptPin(context, slideManager, () -> {
+                                alertManager.setKioskEnabled(false);
+                                if (listener != null) listener.onPreferencesChanged();
+                                show(context, prayerEngine, alertManager, slideManager, listener);
+                            });
+                        } else {
+                            alertManager.setKioskEnabled(true);
+                            if (listener != null) listener.onPreferencesChanged();
+                            show(context, prayerEngine, alertManager, slideManager, listener);
+                        }
                         break;
                 }
             });
@@ -496,6 +510,38 @@ public final class SettingsDialog {
         if (AlertManager.MODE_BEEP.equals(mode)) return "Beep Pendek";
         if (AlertManager.MODE_SILENT.equals(mode)) return "Hening (Visual Saja)";
         return "Adzan Merdu";
+    }
+
+    static void promptPin(Context context, SlideManager slideManager, Runnable onSuccess) {
+        EditText input = new EditText(context);
+        input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER
+                | android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD);
+        input.setHint("PIN Web Admin");
+        input.setSingleLine(true);
+
+        FrameLayout wrap = new FrameLayout(context);
+        int pad = dp(context, 20);
+        wrap.setPadding(pad, dp(context, 6), pad, 0);
+        wrap.addView(input);
+
+        AlertDialog dialog = new AlertDialog.Builder(context, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+                .setTitle("🔒 Buka Kunci Kiosk")
+                .setMessage("Masukkan PIN Web Admin untuk mematikan mode kiosk.")
+                .setView(wrap)
+                .setPositiveButton("Buka Kunci", null)
+                .setNegativeButton("Batal", null)
+                .create();
+
+        dialog.setOnShowListener(d -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            if (slideManager.getAdminPin().equals(input.getText().toString().trim())) {
+                dialog.dismiss();
+                onSuccess.run();
+            } else {
+                input.setError("PIN salah");
+                input.setText("");
+            }
+        }));
+        dialog.show();
     }
 
     private static void showSoundPicker(Context context, PrayerEngine prayerEngine, AlertManager alertManager, SlideManager slideManager, OnSettingsChangeListener listener) {

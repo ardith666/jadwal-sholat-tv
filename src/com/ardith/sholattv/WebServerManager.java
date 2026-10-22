@@ -307,6 +307,7 @@ public final class WebServerManager {
             s.put("countdownEnabled", alertManager.isCountdownEnabled());
             s.put("countdownAudioEnabled", alertManager.isCountdownAudioEnabled());
             s.put("keepAwake", alertManager.isKeepAwake());
+            s.put("kioskEnabled", alertManager.isKioskEnabled());
             s.put("showArab", alertManager.isShowArab());
             s.put("showLatin", alertManager.isShowLatin());
             s.put("showTranslation", alertManager.isShowTranslation());
@@ -369,6 +370,7 @@ public final class WebServerManager {
             alertManager.setCountdownEnabled(req.optBoolean("countdownEnabled", true));
             alertManager.setCountdownAudioEnabled(req.optBoolean("countdownAudioEnabled", true));
             alertManager.setKeepAwake(req.optBoolean("keepAwake", true));
+            alertManager.setKioskEnabled(req.optBoolean("kioskEnabled", true));
             alertManager.setShowArab(req.optBoolean("showArab", true));
             alertManager.setShowLatin(req.optBoolean("showLatin", true));
             alertManager.setShowTranslation(req.optBoolean("showTranslation", true));

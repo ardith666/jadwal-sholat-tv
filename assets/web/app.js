@@ -764,6 +764,7 @@ function populateSettings(s) {
   document.getElementById("chkCountdown").checked = s.countdownEnabled !== false;
   document.getElementById("chkCountdownAudio").checked = s.countdownAudioEnabled !== false;
   document.getElementById("chkKeepAwake").checked = s.keepAwake !== false;
+  document.getElementById("chkKiosk").checked = s.kioskEnabled !== false;
 
   document.getElementById("chkIqomahEnabled").checked = s.iqomahEnabled !== false;
   document.getElementById("iqomahSubuh").value = s.iqomahSubuh || 10;
@@ -940,6 +941,7 @@ function initSettingsForm() {
       countdownEnabled: document.getElementById("chkCountdown").checked,
       countdownAudioEnabled: document.getElementById("chkCountdownAudio").checked,
       keepAwake: document.getElementById("chkKeepAwake").checked,
+      kioskEnabled: document.getElementById("chkKiosk").checked,
       iqomahEnabled: document.getElementById("chkIqomahEnabled").checked,
       iqomahSubuh: parseInt(document.getElementById("iqomahSubuh").value) || 10,
       iqomahDzuhur: parseInt(document.getElementById("iqomahDzuhur").value) || 5,
