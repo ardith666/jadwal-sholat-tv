@@ -263,7 +263,7 @@ public final class SettingsDialog {
                             } else {
                                 new AlertDialog.Builder(context, android.R.style.Theme_DeviceDefault_Dialog_Alert)
                                         .setTitle("Pembaruan Aplikasi")
-                                        .setMessage("Aplikasi Anda sudah menggunakan versi terbaru (v1.6).")
+                                        .setMessage("Aplikasi Anda sudah menggunakan versi terbaru (v1.7).")
                                         .setPositiveButton("OK", (d, w) -> show(context, prayerEngine, alertManager, slideManager, listener))
                                         .setOnCancelListener(d -> show(context, prayerEngine, alertManager, slideManager, listener))
                                         .show();

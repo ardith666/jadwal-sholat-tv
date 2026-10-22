@@ -48,6 +48,10 @@ fi
 "$BT/apksigner" sign --ks "$KEYSTORE" --ks-pass pass:android --out "$B/jadwal-sholat-tv.apk" "$B/aligned.apk"
 echo "✓ Berhasil build $B/jadwal-sholat-tv.apk ($(wc -c < "$B/jadwal-sholat-tv.apk") bytes)"
 
+# Verifikasi konsistensi versi APK
+VER_INFO=$("$BT/aapt2" dump badging "$B/jadwal-sholat-tv.apk" | grep -E "package: name|versionName|versionCode")
+echo "📦 Info Versi APK: $VER_INFO"
+
 if [ "${1:-}" = "--build" ]; then
     exit 0
 fi

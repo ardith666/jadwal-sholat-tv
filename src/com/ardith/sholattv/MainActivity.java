@@ -407,7 +407,7 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
         footer.setPadding(0, dp(6), dp(4), 0);
 
         versionText = new TextView(this);
-        versionText.setText("v1.6 (Rilis: 22 Okt 2026)");
+        versionText.setText("v1.7 (Rilis: 22 Okt 2026)");
         versionText.setTextColor(0x80FFFFFF);
         versionText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
         versionText.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
@@ -511,7 +511,7 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
 
     private void updateFooterIpText() {
         // Tampilkan versi & tanggal build saja di pojok kiri bawah (keterangan IP cukup di Pengaturan)
-        versionText.setText("v1.6 (Rilis: 22 Okt 2026)");
+        versionText.setText("v1.7 (Rilis: 22 Okt 2026)");
     }
 
     private TextView pill(String label) {

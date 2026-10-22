@@ -92,3 +92,12 @@
   - Parser URL RTSP: Perbaikan sanitasi query string dan kredensial kamera dengan karakter khusus (@)
   - Integrasi Multi-CCTV & Live Kajian: Struktur data model v1.5 siap
   - Status: 📝 Dicatat dalam Todo List untuk sesi pengerjaan berikutnya
+
+- [2026-10-22 09:25] Penyelesaian Rilis v1.7 & Evaluasi Versioning Bug:
+  - Evaluasi Bug Versi: Ditemukan bahwa release tag GitHub sebelumnya terbuat sebelum build APK diperbarui versinya di AndroidManifest.xml (sehingga TV mendownload APK v1.6 lama).
+  - Tindakan Mitigasi:
+    1. AndroidManifest dinaikkan ke versionCode=5 dan versionName="1.7".
+    2. Script `build-and-install.sh` diperbarui dengan automated aapt2 version checker sebelum selesai build.
+    3. Binary APK di GitHub Release v1.7 diperbarui via clobber upload.
+    4. Prosedur rilis 4-langkah dibakukan di KNOWLEDGE.md dan Obsidian Vault.
+  - Status: ✅ Terverifikasi di TV TCL (versionCode=5, versionName=1.7, screenshot backup/tcl-66-v17-running-confirmed.png)

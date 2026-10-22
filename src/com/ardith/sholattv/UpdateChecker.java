@@ -25,7 +25,7 @@ import java.nio.charset.StandardCharsets;
 public final class UpdateChecker {
     private static final String TAG = "UpdateChecker";
     private static final String GITHUB_REPO = "ardith666/jadwal-sholat-tv";
-    private static final String CURRENT_VERSION = "1.6";
+    private static final String CURRENT_VERSION = "1.7";
 
     public interface UpdateCheckCallback {
         void onCheckFinished(boolean updateAvailable, String latestTag, String downloadUrl, String releaseNotes);
@@ -114,46 +114,53 @@ public final class UpdateChecker {
         progress.show();
 
         new Thread(() -> {
-            File apkFile = new File(context.getExternalCacheDir(), "jadwal-sholat-update.apk");
+            File apkFile = new File(context.getCacheDir(), "jadwal-sholat-update.apk");
             if (apkFile.exists()) apkFile.delete();
 
             boolean success = false;
             try {
-                URL url = new URL(downloadUrl);
-                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                conn.setRequestProperty("User-Agent", "JadwalSholatTV-Updater");
-                conn.setInstanceFollowRedirects(true);
-                conn.setConnectTimeout(15000);
-                conn.setReadTimeout(30000);
+                URL currentUrl = new URL(downloadUrl);
+                HttpURLConnection conn = null;
+                int redirects = 0;
 
-                // Handle HTTP redirect (GitHub release assets redirect to S3/Azure)
-                int status = conn.getResponseCode();
-                if (status == HttpURLConnection.HTTP_MOVED_TEMP || status == HttpURLConnection.HTTP_MOVED_PERM || status == 307 || status == 308) {
-                    String newUrl = conn.getHeaderField("Location");
-                    conn.disconnect();
-                    url = new URL(newUrl);
-                    conn = (HttpURLConnection) url.openConnection();
-                    conn.setRequestProperty("User-Agent", "JadwalSholatTV-Updater");
-                }
+                while (redirects < 8) {
+                    conn = (HttpURLConnection) currentUrl.openConnection();
+                    conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Android TV; JadwalSholatTV-Updater)");
+                    conn.setInstanceFollowRedirects(true);
+                    conn.setConnectTimeout(20000);
+                    conn.setReadTimeout(30000);
 
-                int totalLength = conn.getContentLength();
-                try (InputStream in = conn.getInputStream();
-                     FileOutputStream out = new FileOutputStream(apkFile)) {
-                    byte[] buffer = new byte[8192];
-                    int len;
-                    long downloaded = 0;
-                    while ((len = in.read(buffer)) != -1) {
-                        out.write(buffer, 0, len);
-                        downloaded += len;
-                        if (totalLength > 0) {
-                            int pct = (int) ((downloaded * 100) / totalLength);
-                            ((Activity) context).runOnUiThread(() -> progress.setProgress(pct));
-                        }
+                    int status = conn.getResponseCode();
+                    if (status == HttpURLConnection.HTTP_MOVED_TEMP || status == HttpURLConnection.HTTP_MOVED_PERM || status == 307 || status == 308) {
+                        String loc = conn.getHeaderField("Location");
+                        conn.disconnect();
+                        currentUrl = new URL(loc);
+                        redirects++;
+                        continue;
                     }
-                    out.flush();
-                    success = true;
+                    break;
                 }
-                conn.disconnect();
+
+                if (conn != null && conn.getResponseCode() == 200) {
+                    int totalLength = conn.getContentLength();
+                    try (InputStream in = conn.getInputStream();
+                         FileOutputStream out = new FileOutputStream(apkFile)) {
+                        byte[] buffer = new byte[8192];
+                        int len;
+                        long downloaded = 0;
+                        while ((len = in.read(buffer)) != -1) {
+                            out.write(buffer, 0, len);
+                            downloaded += len;
+                            if (totalLength > 0) {
+                                int pct = (int) ((downloaded * 100) / totalLength);
+                                ((Activity) context).runOnUiThread(() -> progress.setProgress(pct));
+                            }
+                        }
+                        out.flush();
+                        success = true;
+                    }
+                    conn.disconnect();
+                }
             } catch (Exception e) {
                 Log.e(TAG, "Download APK failed", e);
             }
