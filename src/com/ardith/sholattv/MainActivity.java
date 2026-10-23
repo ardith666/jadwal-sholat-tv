@@ -82,7 +82,6 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
     private TextView greenScreenText;
 
     private boolean isIqomahPhaseActive = false;
-    private boolean kioskLockRequested = false;
     private long iqomahTargetTimestamp = 0;
     private long greenScreenEndTimestamp = 0;
     private String currentPrayerNameForIqomah = "";
@@ -191,15 +190,18 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
 
         buildUI();
         refreshSlidesList();
+        startKioskWatchdog();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
         isActivityActive = true;
+        KioskService.notifyActivityResumed();
         applyKeepAwake();
         applyKioskMode();
         applyTheme();
+        startKioskWatchdog();
 
         RtspProxy.start();
 
@@ -232,6 +234,7 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
     protected void onPause() {
         super.onPause();
         isActivityActive = false;
+        KioskService.notifyActivityPaused();
         handler.removeCallbacksAndMessages(null);
         stopAllVideoStreams();
         RtspProxy.stop();
@@ -256,6 +259,18 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
         if (alertManager != null) {
             alertManager.stopAudio();
         }
+    }
+
+    private void startKioskWatchdog() {
+        if (alertManager != null && alertManager.isKioskEnabled()) {
+            KioskService.start(this);
+        } else {
+            KioskService.stop(this);
+        }
+    }
+
+    private void stopKioskWatchdog() {
+        KioskService.stop(this);
     }
 
     private void applyKeepAwake() {
@@ -287,26 +302,12 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
                             | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
                             | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
 
-            if (!kioskLockRequested && am != null && am.getLockTaskModeState() == ActivityManager.LOCK_TASK_MODE_NONE) {
-                kioskLockRequested = true;
-                try {
-                    startLockTask();
-                } catch (Exception e) {
-                    Log.w(TAG, "startLockTask unavailable", e);
-                }
-            }
         } else {
-            kioskLockRequested = false;
             getWindow().clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
             getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
             if (Build.VERSION.SDK_INT >= 30) {
                 WindowInsetsController controller = getWindow().getInsetsController();
                 if (controller != null) controller.show(WindowInsets.Type.systemBars());
-            }
-            if (am != null && am.getLockTaskModeState() == ActivityManager.LOCK_TASK_MODE_PINNED) {
-                try {
-                    stopLockTask();
-                } catch (Exception ignored) {}
             }
         }
     }
@@ -496,7 +497,7 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
         footer.setPadding(0, dp(6), dp(4), 0);
 
         versionText = new TextView(this);
-        versionText.setText("v1.7 (Rilis: 22 Okt 2026)");
+        versionText.setText("v1.8 (Rilis: 23 Okt 2026)");
         versionText.setTextColor(0x80FFFFFF);
         versionText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
         versionText.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
@@ -612,7 +613,7 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
 
     private void updateFooterIpText() {
         // Tampilkan versi & tanggal build saja di pojok kiri bawah (keterangan IP cukup di Pengaturan)
-        versionText.setText("v1.7 (Rilis: 22 Okt 2026)");
+        versionText.setText("v1.8 (Rilis: 23 Okt 2026)");
     }
 
     private TextView pill(String label) {
@@ -719,7 +720,6 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
             if (alertManager.isKioskEnabled()) {
                 SettingsDialog.promptPin(this, slideManager, () -> {
                     alertManager.setKioskEnabled(false);
-                    kioskLockRequested = false;
                     applyKioskMode();
                     Toast.makeText(this, "Mode kiosk dimatikan. Tekan Home untuk keluar.", Toast.LENGTH_LONG).show();
                 });
@@ -1061,6 +1061,7 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
     public void onPreferencesChanged() {
         applyKeepAwake();
         applyKioskMode();
+        startKioskWatchdog();
         rotateQuranVerse();
         Toast.makeText(this, "Pengaturan disimpan", Toast.LENGTH_SHORT).show();
     }
@@ -1096,6 +1097,7 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
         loadScheduleAsync();
         applyKeepAwake();
         applyKioskMode();
+        startKioskWatchdog();
         applyTheme();
         rotateQuranVerse();
         updateFooterIpText();
