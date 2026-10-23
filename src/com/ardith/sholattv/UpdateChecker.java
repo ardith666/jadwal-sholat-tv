@@ -94,14 +94,22 @@ public final class UpdateChecker {
                 + (notes != null && !notes.isEmpty() ? "Catatan Rilis:\n" + notes + "\n\n" : "")
                 + "Apakah Anda ingin langsung mengunduh dan memperbarui aplikasi?";
 
-        new AlertDialog.Builder(context, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+        KioskService.setWatchdogEnabled(false);
+        AlertDialog dialog = new AlertDialog.Builder(context, android.R.style.Theme_DeviceDefault_Dialog_Alert)
                 .setTitle("🚀 Pembaruan Aplikasi Tersedia")
                 .setMessage(msg)
-                .setPositiveButton("Perbarui Sekarang", (dialog, which) -> {
+                .setPositiveButton("Perbarui Sekarang", (d, which) -> {
+                    KioskService.setWatchdogEnabled(true);
                     startDirectDownloadAndInstall(context, downloadUrl, latestTag);
                 })
-                .setNegativeButton("Nanti Saja", null)
-                .show();
+                .setNegativeButton("Nanti Saja", (d, which) -> KioskService.setWatchdogEnabled(true))
+                .setOnCancelListener(d -> KioskService.setWatchdogEnabled(true))
+                .create();
+        dialog.setOnDismissListener(d -> KioskService.setWatchdogEnabled(true));
+        dialog.show();
+        try {
+            dialog.getButton(AlertDialog.BUTTON_NEGATIVE).requestFocus();
+        } catch (Exception ignored) {}
     }
 
     private static void startDirectDownloadAndInstall(Context context, String downloadUrl, String versionTag) {

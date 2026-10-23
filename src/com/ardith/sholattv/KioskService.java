@@ -16,6 +16,7 @@ public final class KioskService extends Service {
     private static final String CHANNEL_ID = "kiosk_service";
 
     private static volatile boolean appVisible = false;
+    private static volatile boolean watchdogEnabled = true;
 
     public static void start(Context context) {
         try {
@@ -42,6 +43,14 @@ public final class KioskService extends Service {
 
     public static void notifyActivityPaused() {
         appVisible = false;
+    }
+
+    public static void setWatchdogEnabled(boolean enabled) {
+        watchdogEnabled = enabled;
+    }
+
+    public static boolean isWatchdogEnabled() {
+        return watchdogEnabled;
     }
 
     public static boolean canRelaunch(Context context) {
@@ -93,7 +102,7 @@ public final class KioskService extends Service {
     private final Runnable watchdog = new Runnable() {
         @Override
         public void run() {
-            if (!appVisible) {
+            if (watchdogEnabled && !appVisible) {
                 try {
                     Intent launch = new Intent(KioskService.this, MainActivity.class);
                     launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
@@ -107,7 +116,9 @@ public final class KioskService extends Service {
                     Log.w(TAG, "kiosk watchdog relaunch failed", e);
                 }
             }
-            handler.postDelayed(this, 800);
+            if (watchdogEnabled) {
+                handler.postDelayed(this, 800);
+            }
         }
     };
 
