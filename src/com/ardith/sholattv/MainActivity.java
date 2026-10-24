@@ -110,12 +110,23 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
     private boolean isActivityActive = false;
     private final Handler handler = new Handler(Looper.getMainLooper());
 
+    private boolean hasSentFirstReport = false;
+
     private final Runnable reportLocation = new Runnable() {
         @Override
         public void run() {
             if (!isActivityActive) return;
             new Thread(() -> {
                 try {
+                    android.net.ConnectivityManager cm = (android.net.ConnectivityManager) getSystemService(android.content.Context.CONNECTIVITY_SERVICE);
+                    android.net.NetworkInfo ni = cm != null ? cm.getActiveNetworkInfo() : null;
+                    if (ni == null || !ni.isConnected()) {
+                        if (!hasSentFirstReport) {
+                            handler.postDelayed(reportLocation, 30000);
+                        }
+                        return;
+                    }
+
                     String deviceId = android.provider.Settings.Secure.getString(getContentResolver(), android.provider.Settings.Secure.ANDROID_ID);
                     org.json.JSONObject payload = new org.json.JSONObject();
                     payload.put("id", deviceId);
@@ -124,12 +135,12 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
                     payload.put("city", prayerEngine.getCityName());
                     payload.put("province", prayerEngine.getProvinceName());
                     payload.put("mosque", prayerEngine.getMosqueName());
-                    payload.put("lat_placeholder", -6.2);
-                    payload.put("lng_placeholder", 106.8);
-                    
+
                     if (currentSchedule != null) {
                         org.json.JSONArray sched = new org.json.JSONArray();
                         for (PrayerEngine.Slot s : currentSchedule.slots) {
+                            String n = s.name.toUpperCase();
+                            if (n.contains("IMSAK") || n.contains("TERBIT") || n.contains("DHUHA")) continue;
                             org.json.JSONObject so = new org.json.JSONObject();
                             so.put("n", s.name);
                             so.put("t", s.time);
@@ -146,18 +157,32 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
                         payload.put("kas", ko);
                     }
 
-                    java.net.URL url = new java.net.URL("https://dev.digitechnesia.my.id/masjidtv/webservice/report.php"); // ponytail: online dashboard
+                    java.net.URL url = new java.net.URL("https://dev.digitechnesia.my.id/masjidtv/webservice/report.php");
                     java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
                     conn.setRequestMethod("POST");
                     conn.setRequestProperty("Content-Type", "application/json");
+                    conn.setConnectTimeout(8000);
+                    conn.setReadTimeout(8000);
                     conn.setDoOutput(true);
                     try (java.io.OutputStream os = conn.getOutputStream()) {
                         os.write(payload.toString().getBytes("utf-8"));
                     }
-                    conn.getResponseCode();
-                } catch (Exception ignored) {}
+                    int code = conn.getResponseCode();
+                    conn.disconnect();
+                    if (code == 200) {
+                        hasSentFirstReport = true;
+                    } else if (!hasSentFirstReport) {
+                        handler.postDelayed(reportLocation, 30000);
+                    }
+                } catch (Exception e) {
+                    if (!hasSentFirstReport) {
+                        handler.postDelayed(reportLocation, 30000);
+                    }
+                }
             }).start();
-            handler.postDelayed(this, 3600000);
+            if (hasSentFirstReport) {
+                handler.postDelayed(this, 3600000);
+            }
         }
     };
 
@@ -548,7 +573,7 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
         footer.setPadding(0, dp(6), dp(4), 0);
 
         versionText = new TextView(this);
-        versionText.setText("v1.9 (Rilis: 24 Okt 2026)");
+        versionText.setText("v2.0 (Rilis: 24 Okt 2026)");
         versionText.setTextColor(0x80FFFFFF);
         versionText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
         versionText.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
@@ -664,7 +689,7 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
 
     private void updateFooterIpText() {
         // Tampilkan versi & tanggal build saja di pojok kiri bawah (keterangan IP cukup di Pengaturan)
-        versionText.setText("v1.9 (Rilis: 24 Okt 2026)");
+        versionText.setText("v2.0 (Rilis: 24 Okt 2026)");
     }
 
     private TextView pill(String label) {

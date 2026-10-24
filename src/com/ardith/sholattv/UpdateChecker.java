@@ -25,7 +25,7 @@ import java.nio.charset.StandardCharsets;
 public final class UpdateChecker {
     private static final String TAG = "UpdateChecker";
     private static final String GITHUB_REPO = "ardith666/jadwal-sholat-tv";
-    private static final String CURRENT_VERSION = "1.9";
+    private static final String CURRENT_VERSION = "2.0";
 
     public interface UpdateCheckCallback {
         void onCheckFinished(boolean updateAvailable, String latestTag, String downloadUrl, String releaseNotes);

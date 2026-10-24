@@ -215,10 +215,7 @@ public final class PrayerEngine {
             String tanggal = j.optString("tanggal", "");
             DaySchedule ds = new DaySchedule(date, tanggal, lokasi);
 
-            addSlot(ds, "Imsak", j.optString("imsak"));
             addSlot(ds, "Subuh", j.optString("subuh"));
-            addSlot(ds, "Terbit", j.optString("terbit"));
-            addSlot(ds, "Dhuha", j.optString("dhuha"));
             addSlot(ds, "Dzuhur", j.optString("dzuhur"));
             addSlot(ds, "Ashar", j.optString("ashar"));
             addSlot(ds, "Maghrib", j.optString("maghrib"));
