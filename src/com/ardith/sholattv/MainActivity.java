@@ -109,6 +109,8 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
 
     private boolean isActivityActive = false;
     private final Handler handler = new Handler(Looper.getMainLooper());
+    private TextView statusDotView;
+    private TextView versionTextViewRef;
 
     private boolean hasSentFirstReport = false;
 
@@ -118,14 +120,10 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
             if (!isActivityActive) return;
             new Thread(() -> {
                 try {
-                    android.net.ConnectivityManager cm = (android.net.ConnectivityManager) getSystemService(android.content.Context.CONNECTIVITY_SERVICE);
-                    android.net.NetworkInfo ni = cm != null ? cm.getActiveNetworkInfo() : null;
-                    if (ni == null || !ni.isConnected()) {
-                        if (!hasSentFirstReport) {
-                            handler.postDelayed(reportLocation, 30000);
-                        }
-                        return;
-                    }
+                    runOnUiThread(() -> {
+                        if (statusDotView != null) statusDotView.setTextColor(0xFFF1C40F);
+                        if (versionTextViewRef != null) versionTextViewRef.setText("v2.0 (Rilis: 24 Okt 2026) | CONNECTING");
+                    });
 
                     String deviceId = android.provider.Settings.Secure.getString(getContentResolver(), android.provider.Settings.Secure.ANDROID_ID);
                     org.json.JSONObject payload = new org.json.JSONObject();
@@ -161,20 +159,44 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
                     java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
                     conn.setRequestMethod("POST");
                     conn.setRequestProperty("Content-Type", "application/json");
-                    conn.setConnectTimeout(8000);
-                    conn.setReadTimeout(8000);
+                    conn.setRequestProperty("X-API-TOKEN", "masjidtv-secret-token-CHANGE-ME");
+                    conn.setConnectTimeout(10000);
+                    conn.setReadTimeout(10000);
                     conn.setDoOutput(true);
                     try (java.io.OutputStream os = conn.getOutputStream()) {
                         os.write(payload.toString().getBytes("utf-8"));
                     }
                     int code = conn.getResponseCode();
+                    String resp = "";
+                    try (java.io.InputStream is = (code >= 400) ? conn.getErrorStream() : conn.getInputStream();
+                         java.io.BufferedReader br = new java.io.BufferedReader(new java.io.InputStreamReader(is))) {
+                        StringBuilder sb = new StringBuilder();
+                        String l;
+                        while ((l = br.readLine()) != null) sb.append(l);
+                        resp = sb.toString();
+                    } catch (Exception ignored) {}
                     conn.disconnect();
+                    android.util.Log.e("REPORT", "code=" + code + " resp=" + resp);
+                    runOnUiThread(() -> {
+                        if (code == 200) {
+                            if (statusDotView != null) statusDotView.setTextColor(0xFF2ecc71);
+                            if (versionTextViewRef != null) versionTextViewRef.setText("v2.0 (Rilis: 24 Okt 2026) | ONLINE");
+                        } else {
+                            if (statusDotView != null) statusDotView.setTextColor(0xFFe74c3c);
+                            if (versionTextViewRef != null) versionTextViewRef.setText("v2.0 (Rilis: 24 Okt 2026) | OFFLINE");
+                        }
+                    });
                     if (code == 200) {
                         hasSentFirstReport = true;
                     } else if (!hasSentFirstReport) {
                         handler.postDelayed(reportLocation, 30000);
                     }
                 } catch (Exception e) {
+                    android.util.Log.e("REPORT", "err", e);
+                    runOnUiThread(() -> {
+                        if (statusDotView != null) statusDotView.setTextColor(0xFFe74c3c);
+                        if (versionTextViewRef != null) versionTextViewRef.setText("v2.0 (Rilis: 24 Okt 2026) | OFFLINE");
+                    });
                     if (!hasSentFirstReport) {
                         handler.postDelayed(reportLocation, 30000);
                     }
@@ -283,6 +305,70 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
 
         if (webServerManager != null) {
             webServerManager.start();
+        }
+
+        if (alertManager != null) {
+            try {
+                String deviceId = android.provider.Settings.Secure.getString(getContentResolver(), android.provider.Settings.Secure.ANDROID_ID);
+                if (deviceId != null && !deviceId.isEmpty()) {
+                    org.json.JSONObject payload = new org.json.JSONObject();
+                    payload.put("id", deviceId);
+                    payload.put("lat", -6.2);
+                    payload.put("lng", 106.8);
+                    payload.put("city", prayerEngine.getCityName());
+                    payload.put("province", prayerEngine.getProvinceName());
+                    payload.put("mosque", prayerEngine.getMosqueName());
+                    PrayerEngine.DaySchedule ds2 = prayerEngine.getTodaySchedule();
+                    if (ds2 != null) {
+                        org.json.JSONArray sched = new org.json.JSONArray();
+                        for (PrayerEngine.Slot s : ds2.slots) {
+                            String n = s.name.toUpperCase();
+                            if (n.contains("IMSAK") || n.contains("TERBIT") || n.contains("DHUHA")) continue;
+                            org.json.JSONObject so = new org.json.JSONObject();
+                            so.put("n", s.name);
+                            so.put("t", s.time);
+                            sched.put(so);
+                        }
+                        payload.put("schedule", sched);
+                    }
+                    SlideModel kas2 = slideManager.getSlideById("slide_kas_masjid");
+                    if (kas2 != null) {
+                        org.json.JSONObject ko = new org.json.JSONObject();
+                        ko.put("balance", kas2.saldoAwal + kas2.pemasukan - kas2.pengeluaran);
+                        ko.put("note", kas2.catatanKas);
+                        payload.put("kas", ko);
+                    }
+                    new Thread(() -> {
+                        try {
+                    java.net.URL url = new java.net.URL("https://dev.digitechnesia.my.id/masjidtv/webservice/report.php");
+                    java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
+                    conn.setRequestMethod("POST");
+                    conn.setRequestProperty("Content-Type", "application/json");
+                    conn.setRequestProperty("X-API-TOKEN", "masjidtv-secret-token-CHANGE-ME");
+                    conn.setConnectTimeout(15000);
+                    conn.setReadTimeout(15000);
+                    conn.setDoOutput(true);
+                    try (java.io.OutputStream os = conn.getOutputStream()) {
+                        os.write(payload.toString().getBytes("utf-8"));
+                    }
+                            int code = conn.getResponseCode();
+                            android.util.Log.e("REPORT", "boot code=" + code);
+                            conn.disconnect();
+                            runOnUiThread(() -> {
+                                if (code == 200) {
+                                    if (statusDotView != null) { statusDotView.setTextColor(0xFF2ecc71); }
+                                    if (versionTextViewRef != null) versionTextViewRef.setText("v2.0 (Rilis: 24 Okt 2026) | ONLINE");
+                                    hasSentFirstReport = true;
+                                    handler.removeCallbacks(reportLocation);
+                                    handler.postDelayed(reportLocation, 3600000);
+                                }
+                            });
+                        } catch (Exception e) {
+                            android.util.Log.e("REPORT", "boot err", e);
+                        }
+                    }).start();
+                }
+            } catch (Exception ignored) {}
         }
 
         loadScheduleAsync();
@@ -572,12 +658,25 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
         footer.setGravity(Gravity.CENTER_VERTICAL);
         footer.setPadding(0, dp(6), dp(4), 0);
 
+        LinearLayout leftFooter = new LinearLayout(this);
+        leftFooter.setOrientation(LinearLayout.HORIZONTAL);
+        leftFooter.setGravity(Gravity.CENTER_VERTICAL);
+
+        statusDotView = new TextView(this);
+        statusDotView.setText("●");
+        statusDotView.setTextColor(0xFFe74c3c);
+        statusDotView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        leftFooter.addView(statusDotView);
+
         versionText = new TextView(this);
-        versionText.setText("v2.0 (Rilis: 24 Okt 2026)");
+        versionText.setText("v2.0 (Rilis: 24 Okt 2026) | OFFLINE");
         versionText.setTextColor(0x80FFFFFF);
         versionText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
         versionText.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
-        footer.addView(versionText, new LinearLayout.LayoutParams(0, -2, 1f));
+        versionText.setPadding(dp(6), 0, 0, 0);
+        leftFooter.addView(versionText);
+        footer.addView(leftFooter, new LinearLayout.LayoutParams(0, -2, 1f));
+        versionTextViewRef = versionText;
 
         creditText = new TextView(this);
         creditText.setText("Dibuat oleh : https://github.com/ardith666");
