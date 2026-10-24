@@ -101,3 +101,10 @@
     3. Binary APK di GitHub Release v1.7 diperbarui via clobber upload.
     4. Prosedur rilis 4-langkah dibakukan di KNOWLEDGE.md dan Obsidian Vault.
   - Status: ✅ Terverifikasi di TV TCL (versionCode=5, versionName=1.7, screenshot backup/tcl-66-v17-running-confirmed.png)
+
+- [2026-10-23 00:xx] Rilis v1.8.1 - Fix Update Dialog Focus & Kiosk Watchdog:
+  - Fix: Watchdog KioskService dihentikan saat dialog update muncul (hindari reorder fokus D-pad)
+  - Bump: versionCode 7, versionName 1.8.1 di AndroidManifest.xml & UpdateChecker
+  - Footer & Settings update ke v1.8.1 (Rilis: 23 Okt 2026)
+  - GitHub Release v1.8.1 dibuat/diperbarui, tag dipaksa, APK diupload ulang
+  - Status: ✅ Terinstal di TCL Google TV & terverifikasi

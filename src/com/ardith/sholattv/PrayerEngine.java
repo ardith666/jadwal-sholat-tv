@@ -112,6 +112,18 @@ public final class PrayerEngine {
                 .apply();
     }
 
+    public String getProvinceName() {
+        return ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .getString("province_name", "");
+    }
+
+    public void setProvinceName(String name) {
+        ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit()
+                .putString("province_name", name == null ? "" : name)
+                .apply();
+    }
+
     public List<City> loadCities() {
         List<City> list = new ArrayList<>();
         try (InputStream in = ctx.getAssets().open("data/cities.json");

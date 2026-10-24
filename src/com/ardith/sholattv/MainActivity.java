@@ -110,6 +110,57 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
     private boolean isActivityActive = false;
     private final Handler handler = new Handler(Looper.getMainLooper());
 
+    private final Runnable reportLocation = new Runnable() {
+        @Override
+        public void run() {
+            if (!isActivityActive) return;
+            new Thread(() -> {
+                try {
+                    String deviceId = android.provider.Settings.Secure.getString(getContentResolver(), android.provider.Settings.Secure.ANDROID_ID);
+                    org.json.JSONObject payload = new org.json.JSONObject();
+                    payload.put("id", deviceId);
+                    payload.put("lat", -6.2);
+                    payload.put("lng", 106.8);
+                    payload.put("city", prayerEngine.getCityName());
+                    payload.put("province", prayerEngine.getProvinceName());
+                    payload.put("mosque", prayerEngine.getMosqueName());
+                    payload.put("lat_placeholder", -6.2);
+                    payload.put("lng_placeholder", 106.8);
+                    
+                    if (currentSchedule != null) {
+                        org.json.JSONArray sched = new org.json.JSONArray();
+                        for (PrayerEngine.Slot s : currentSchedule.slots) {
+                            org.json.JSONObject so = new org.json.JSONObject();
+                            so.put("n", s.name);
+                            so.put("t", s.time);
+                            sched.put(so);
+                        }
+                        payload.put("schedule", sched);
+                    }
+
+                    SlideModel kas = slideManager.getSlideById("slide_kas_masjid");
+                    if (kas != null) {
+                        org.json.JSONObject ko = new org.json.JSONObject();
+                        ko.put("balance", kas.saldoAwal + kas.pemasukan - kas.pengeluaran);
+                        ko.put("note", kas.catatanKas);
+                        payload.put("kas", ko);
+                    }
+
+                    java.net.URL url = new java.net.URL("https://dev.digitechnesia.my.id/masjidtv/webservice/report.php"); // ponytail: online dashboard
+                    java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
+                    conn.setRequestMethod("POST");
+                    conn.setRequestProperty("Content-Type", "application/json");
+                    conn.setDoOutput(true);
+                    try (java.io.OutputStream os = conn.getOutputStream()) {
+                        os.write(payload.toString().getBytes("utf-8"));
+                    }
+                    conn.getResponseCode();
+                } catch (Exception ignored) {}
+            }).start();
+            handler.postDelayed(this, 3600000);
+        }
+    };
+
     private final Runnable timerTick = new Runnable() {
         @Override
         public void run() {
@@ -947,7 +998,11 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
                     greenScreenText.setText("WAKTU SHOLAT " + currentPrayerNameForIqomah.toUpperCase() + "\nLURUS & RAPATKAN SHAF");
                 } else {
                     isAdzanApproaching = false;
-                    scheduleNextSlide();
+        handler.removeCallbacks(reportLocation);
+        handler.post(reportLocation);
+
+        scheduleNextSlide();
+
                 }
                 return;
             }
