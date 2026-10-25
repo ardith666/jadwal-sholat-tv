@@ -38,3 +38,9 @@ Agar tidak terjadi bug versi di mana release tag GitHub tidak cocok dengan versi
    - Jika tag baru: `gh release create <tag> build/jadwal-sholat-tv.apk --title "..." --notes "..."`.
 4. **Verifikasi Unduhan**:
    - Lakukan uji unduh URL langsung (`curl -sL <browser_download_url>`) dan cek badging aapt2 bahwa binary di cloud sudah identik dengan versi baru.
+
+## 2026-10-25 - Bug: UpdateChecker tidak sync dengan versi terinstall
+- **Masalah:** TV menunjukkan versi 2.0 namun UpdateChecker menampilkan "update tersedia" ke 2.0.1 karena `CURRENT_VERSION` di `UpdateChecker.java` tertinggal (harus sama dengan `AndroidManifest` `versionName`).
+- **Root cause:** Bukan `versionName` di manifest/UI saja yang dibump, tapi `CURRENT_VERSION` di `UpdateChecker.java` juga WAJIB disamakan. Jika tertinggal, app akan selalu bilang update meski sudah diinstall.
+- **Solusi:** Saat bump versi, update semua: `AndroidManifest.xml` (versionCode + versionName), `MainActivity.java` (text footer), `SettingsDialog.java` (pesan), `UpdateChecker.java` (CURRENT_VERSION).
+- **Catatan:** Download URL dari GitHub release harus valid. Jika install dari release beda build, APK bisa tetap sama.

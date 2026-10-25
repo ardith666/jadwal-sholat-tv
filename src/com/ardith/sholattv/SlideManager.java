@@ -137,10 +137,10 @@ public final class SlideManager {
 
         // Slide 2: Template Kas Masjid (DEFAULT NON-AKTIF)
         SlideModel s2 = new SlideModel("slide_kas_masjid", SlideModel.TYPE_KAS, "Laporan Keuangan & Kas Masjid", false, 25);
-        s2.saldoAwal = 12500000;
-        s2.pemasukan = 4250000;
-        s2.pengeluaran = 1850000;
-        s2.catatanKas = "Pemasukan Infaq Kotak Jumat & Operasional Kebersihan Masjid";
+        s2.saldoAwal = 0;
+        s2.pemasukan = 0;
+        s2.pengeluaran = 0;
+        s2.catatanKas = "";
 
         // Slide 3: Template Agenda Kajian Multi-Item (DEFAULT NON-AKTIF)
         SlideModel s3 = new SlideModel("slide_agenda_kajian", SlideModel.TYPE_ANNOUNCEMENT, "Agenda Kajian & Pengumuman", false, 25);

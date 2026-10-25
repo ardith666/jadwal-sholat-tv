@@ -788,7 +788,7 @@ public class MainActivity extends Activity implements SettingsDialog.OnSettingsC
 
     private void updateFooterIpText() {
         // Tampilkan versi & tanggal build saja di pojok kiri bawah (keterangan IP cukup di Pengaturan)
-        versionText.setText("v2.0 (Rilis: 24 Okt 2026)");
+        versionText.setText("v2.0.1 (Rilis: 24 Okt 2026)");
     }
 
     private TextView pill(String label) {

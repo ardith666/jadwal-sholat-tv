@@ -19,12 +19,13 @@ if (!$data || empty($data['id'])) {
     exit;
 }
 
+$id = $data['id'];
+
 try {
     $pdo = new PDO('mysql:host=' . DB_HOST . ';dbname=' . DB_NAME . ';charset=utf8mb4', DB_USER, DB_PASS, [
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION
     ]);
     
-    $id = $data['id'];
     $now = date('Y-m-d H:i:s');
     
     $stmt = $pdo->prepare("INSERT INTO devices (device_id, lat, lng, city, province, mosque, payload, last_seen) VALUES (?,?,?,?,?,?,?,?) 
@@ -41,11 +42,6 @@ try {
     
     echo json_encode(['status' => 'ok']);
 } catch (Exception $e) {
-    // Fallback to JSON if DB not set
-    $dbf = __DIR__ . '/devices.json';
-    $devices = file_exists($dbf) ? json_decode(file_get_contents($dbf), true) : [];
-    $data['last_seen'] = date('Y-m-d H:i:s');
-    $devices[$id] = $data;
-    file_put_contents($dbf, json_encode($devices));
-    echo json_encode(['status' => 'ok', 'fallback' => 'json']);
+    http_response_code(500);
+    echo json_encode(['status' => 'error', 'msg' => $e->getMessage()]);
 }
