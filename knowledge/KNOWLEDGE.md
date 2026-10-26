@@ -39,6 +39,12 @@ Agar tidak terjadi bug versi di mana release tag GitHub tidak cocok dengan versi
 4. **Verifikasi Unduhan**:
    - Lakukan uji unduh URL langsung (`curl -sL <browser_download_url>`) dan cek badging aapt2 bahwa binary di cloud sudah identik dengan versi baru.
 
+## 2026-10-25 - v2.1: Modern Dashboard & MySQL Migration
+- **Updates:** Dashboard dirombak total menggunakan Tailwind CSS (Responsive, Dark/Light Mode).
+- **Architecture:** Pelaporan TV migrasi penuh ke MySQL (`api.php` & `report.php`). Fallback JSON dihapus untuk keamanan.
+- **Reporting:** Data history 500 terbaru kini tersimpan di database dan dapat dipantau di dashboard.
+- **Maintenance:** `UpdateChecker.java`, `AndroidManifest.xml`, dan UI disinkronkan ke v2.1 (versionCode 11).
+
 ## 2026-10-25 - Bug: UpdateChecker tidak sync dengan versi terinstall
 - **Masalah:** TV menunjukkan versi 2.0 namun UpdateChecker menampilkan "update tersedia" ke 2.0.1 karena `CURRENT_VERSION` di `UpdateChecker.java` tertinggal (harus sama dengan `AndroidManifest` `versionName`).
 - **Root cause:** Bukan `versionName` di manifest/UI saja yang dibump, tapi `CURRENT_VERSION` di `UpdateChecker.java` juga WAJIB disamakan. Jika tertinggal, app akan selalu bilang update meski sudah diinstall.

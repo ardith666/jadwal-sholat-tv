@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#064e3b" />
+      <stop offset="50%" stop-color="#047857" />
+      <stop offset="100%" stop-color="#022c22" />
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fef08a" />
+      <stop offset="50%" stop-color="#facc15" />
+      <stop offset="100%" stop-color="#ca8a04" />
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000" flood-opacity="0.35" />
+    </filter>
+  </defs>
+  
+  <!-- Background rounded squircle -->
+  <rect width="512" height="512" rx="112" fill="url(#bg)" />
+  
+  <!-- Subtle Islamic star / geometric outline -->
+  <circle cx="256" cy="256" r="210" fill="none" stroke="#10b981" stroke-width="4" stroke-opacity="0.25" stroke-dasharray="10 6" />
+  
+  <!-- TV Bezel Outline -->
+  <rect x="76" y="96" width="360" height="260" rx="24" fill="#0f172a" fill-opacity="0.5" stroke="url(#gold)" stroke-width="6" filter="url(#shadow)" />
+  
+  <!-- Mosque Dome Inside TV -->
+  <!-- Main Dome -->
+  <path d="M 256 140 C 230 180 200 210 200 260 L 312 260 C 312 210 282 180 256 140 Z" fill="url(#gold)" />
+  <!-- Crescent & Star Finial -->
+  <path d="M 256 122 A 12 12 0 1 1 254 138 A 9 9 0 1 0 254 122 Z" fill="#fef08a" />
+  <circle cx="256" cy="122" r="3" fill="#fef08a" />
+  
+  <!-- Side Minarets -->
+  <rect x="156" y="210" width="24" height="70" rx="4" fill="#34d399" />
+  <polygon points="168,185 152,210 184,210" fill="url(#gold)" />
+  
+  <rect x="332" y="210" width="24" height="70" rx="4" fill="#34d399" />
+  <polygon points="344,185 328,210 360,210" fill="url(#gold)" />
+  
+  <!-- Mosque Base / Arches -->
+  <path d="M 180 280 L 332 280 L 332 300 L 180 300 Z" fill="#047857" />
+  <path d="M 226 300 A 30 30 0 0 1 286 300 Z" fill="#022c22" />
+  
+  <!-- TV Stand -->
+  <path d="M 236 360 L 276 360 L 286 400 L 226 400 Z" fill="#047857" opacity="0.8" />
+  <rect x="196" y="400" width="120" height="12" rx="6" fill="url(#gold)" />
+  
+  <!-- Glowing signal waves / Broadcast indicator -->
+  <circle cx="410" cy="120" r="8" fill="#22c55e" />
+  <circle cx="410" cy="120" r="14" fill="none" stroke="#22c55e" stroke-width="3" opacity="0.6" />
+</svg>
